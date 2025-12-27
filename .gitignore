@@ -1,19 +1,23 @@
 # =====================================================
-# Termux Flutter .gitignore
+# Termux Flutter WSL .gitignore
 # =====================================================
 
 # ----- 大型構建產物 (不需要版本控制) -----
-termux-flutter/flutter/
-termux-flutter/sysroot/
-termux-flutter/release/
-termux-flutter/*.deb
-termux-flutter/out/
+flutter/
+sysroot/
+release/
+depot_tools/
+*.deb
+out/
 
 # ----- 臨時文件存檔 -----
 _archive/
 
-# ----- 參考專案 (可選，如果你想保留可註釋掉) -----
+# ----- 參考專案 -----
 reference_termux_flutter/
+
+# ----- 舊版子目錄 (遷移後移除) -----
+termux-flutter/
 
 # ----- Python 相關 -----
 __pycache__/
@@ -50,9 +54,7 @@ node_modules/
 .cache/
 .ninja_log
 .ninja_deps
-
-# ----- depot_tools -----
-termux-flutter/depot_tools/
+.gclient
 
 # ----- 中間產物 -----
 *.o

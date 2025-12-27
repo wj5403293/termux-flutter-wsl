@@ -63,15 +63,13 @@ flutter --version
 ### Build from Source (on WSL)
 
 ```bash
-cd termux-flutter
-
 # Build everything
 ./build_termux_flutter.sh
 
 # Or step-by-step
 python3 build.py sysroot --arch=arm64    # Assemble Termux sysroot
-python3 build.py configure arch=arm64 mode=debug
-python3 build.py build arch=arm64 mode=debug
+python3 build.py configure --arch=arm64 --mode=debug
+python3 build.py build --arch=arm64 --mode=debug
 python3 build.py debuild --arch=arm64    # Package .deb
 ```
 
@@ -81,14 +79,14 @@ python3 build.py debuild --arch=arm64    # Package .deb
 
 ```
 termux-flutter-wsl/
-├── termux-flutter/           # Build tools (forked)
-│   ├── build.py              # Main build script
-│   ├── build.toml            # Configuration
-│   ├── patches/              # Engine patches
-│   └── build_termux_flutter.sh
-├── assets/                   # Project assets
-├── .agent/workflows/         # Automation workflows
-└── _archive/                 # Temporary files (ignored)
+├── build.py              # Main build script
+├── build.toml            # Configuration
+├── patches/              # Engine patches
+├── build_termux_flutter.sh  # One-click build
+├── README.md             # Chinese docs
+├── README_EN.md          # English docs
+├── assets/               # Assets
+└── .agent/workflows/     # Automation
 ```
 
 ---
@@ -135,14 +133,15 @@ ldflags = [
 
 ## 🔄 Sync with Upstream
 
-To pull the latest updates from the original project (mumumusuc/termux-flutter), use the provided sync script:
+This project is a fork of [mumumusuc/termux-flutter](https://github.com/mumumusuc/termux-flutter). To sync updates:
 
 ```bash
-# This attempts to merge upstream/main into this project
-./sync_upstream.sh
+git remote add upstream https://github.com/mumumusuc/termux-flutter.git
+git fetch upstream
+git merge upstream/main
 ```
 
-**Note**: Merge conflicts may occur because we customized build scripts (e.g., `build.py`) for WSL support. Please resolve conflicts manually if they arise.
+**Note**: Merge conflicts may occur because we customized build scripts for WSL support. Please resolve conflicts manually.
 
 ---
 - [Flutter](https://flutter.dev/) - Google's UI Toolkit

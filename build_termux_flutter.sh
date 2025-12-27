@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Termux Flutter 自動化構建腳本
 # 用途：為 Termux 交叉編譯 Flutter Engine 並打包成 .deb
-# 用法：./build_termux_flutter.sh [flutter_version]
+# 用法：./build_termux_flutter.sh
 
 set -e
 
@@ -9,7 +9,7 @@ set -e
 # 配置區域 - 根據你的環境修改
 # =====================================================
 NDK_PATH="/opt/android-ndk-r27d"
-BUILD_DIR="/mnt/d/OtherProject/mine/flutter_termux/termux-flutter"
+BUILD_DIR="$(cd "$(dirname "$0")" && pwd)"
 ARCH="arm64"
 MODE="debug"
 

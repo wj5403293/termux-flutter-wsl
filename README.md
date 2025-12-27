@@ -63,15 +63,13 @@ flutter --version
 ### 自行編譯（WSL 環境）
 
 ```bash
-cd termux-flutter
-
 # 一鍵構建
 ./build_termux_flutter.sh
 
 # 或分步驟執行
 python3 build.py sysroot --arch=arm64    # 組裝 Termux 運行時依賴
-python3 build.py configure arch=arm64 mode=debug
-python3 build.py build arch=arm64 mode=debug
+python3 build.py configure --arch=arm64 --mode=debug
+python3 build.py build --arch=arm64 --mode=debug
 python3 build.py debuild --arch=arm64    # 打包 .deb
 ```
 
@@ -81,14 +79,14 @@ python3 build.py debuild --arch=arm64    # 打包 .deb
 
 ```
 termux-flutter-wsl/
-├── termux-flutter/           # 主要構建工具
-│   ├── build.py              # 主構建腳本
-│   ├── build.toml            # 構建配置
-│   ├── patches/              # 引擎補丁
-│   └── build_termux_flutter.sh  # 一鍵構建腳本
-├── assets/                   # 專案資源
-├── .agent/workflows/         # 自動化工作流
-└── _archive/                 # 臨時文件存檔 (不包含在版本控制中)
+├── build.py              # 主構建腳本
+├── build.toml            # 構建配置
+├── patches/              # 引擎補丁
+├── build_termux_flutter.sh  # 一鍵構建腳本
+├── README.md             # 中文文檔
+├── README_EN.md          # 英文文檔
+├── assets/               # 專案資源
+└── .agent/workflows/     # 自動化工作流
 ```
 
 ---
@@ -135,14 +133,15 @@ ldflags = [
 
 ## 🔄 同步上游更新
 
-如果你想要獲取原專案 (mumumusuc/termux-flutter) 的最新更新（例如新的 Flutter 版本支援），可以使用我們提供的同步腳本：
+本專案是 [mumumusuc/termux-flutter](https://github.com/mumumusuc/termux-flutter) 的 Fork。要獲取上游更新：
 
 ```bash
-# 這將會嘗試合併上游的 main 分支到本專案
-./sync_upstream.sh
+git remote add upstream https://github.com/mumumusuc/termux-flutter.git
+git fetch upstream
+git merge upstream/main
 ```
 
-**注意**：由於我們為了支援 WSL 修改了部分構建腳本（如 `build.py`），同步時可能會發生衝突。如果發生衝突，請手動解決並提交。
+**注意**：由於我們為 WSL 修改了部分構建腳本，合併時可能會發生衝突，請手動解決。
 
 ---
 - [Flutter](https://flutter.dev/) - Google 的 UI 框架
