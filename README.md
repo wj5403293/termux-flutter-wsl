@@ -49,6 +49,41 @@
 - 📦 成功產出 `flutter_3.35.0_aarch64.deb` (541MB)
 - 🤖 完整的自動化構建流程
 
+### ⚠️ 系統需求
+
+| 項目 | 最低需求 |
+|------|----------|
+| Android 版本 | **Android 11 (API 30)** 或更高 |
+| 架構 | ARM64 (aarch64) |
+| Termux | 從 [F-Droid](https://f-droid.org/packages/com.termux/) 安裝 |
+
+> ⚠️ **重要**：Android SDK 中的 `adb` 需要 Android 11+ 的系統函數 (`pthread_cond_clockwait`)。在 Android 10 或更舊的設備上，需要額外步驟（見下方）。
+
+<details>
+<summary><b>🔧 Android 10 或更舊設備的 ADB 修復方法</b></summary>
+
+如果你的設備是 Android 10 或更舊版本，`termux-android-sdk` 的 adb 會出現以下錯誤：
+```
+CANNOT LINK EXECUTABLE "adb": cannot locate symbol "pthread_cond_clockwait"
+```
+
+**解決方案：** 安裝 [MasterDevX/Termux-ADB](https://github.com/MasterDevX/Termux-ADB) 並替換 adb：
+
+```bash
+# 1. 安裝舊版相容的 adb
+wget https://github.com/MasterDevX/Termux-ADB/raw/master/InstallTools.sh -q && bash InstallTools.sh
+
+# 2. 用相容版本替換 Android SDK 的 adb
+cp $PREFIX/bin/adb.bin $PREFIX/opt/android-sdk/platform-tools/adb
+
+# 3. 驗證
+flutter doctor
+```
+
+這會安裝 adb 1.0.39 (android-8.0.0)，可在 Android 9 及更舊設備上運行。
+
+</details>
+
 ---
 
 ## 🚀 快速開始

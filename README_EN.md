@@ -49,6 +49,41 @@ This project is based on [mumumusuc/termux-flutter](https://github.com/mumumusuc
 - 📦 Produced `flutter_3.35.0_aarch64.deb` (541MB)
 - 🤖 Fully automated build scripts
 
+### ⚠️ System Requirements
+
+| Item | Minimum |
+|------|---------|
+| Android Version | **Android 11 (API 30)** or higher |
+| Architecture | ARM64 (aarch64) |
+| Termux | Install from [F-Droid](https://f-droid.org/packages/com.termux/) |
+
+> ⚠️ **Important**: The `adb` in Android SDK requires Android 11+ system functions (`pthread_cond_clockwait`). On Android 10 or older devices, extra steps are required (see below).
+
+<details>
+<summary><b>🔧 ADB Fix for Android 10 or Older Devices</b></summary>
+
+If your device is Android 10 or older, `termux-android-sdk`'s adb will show this error:
+```
+CANNOT LINK EXECUTABLE "adb": cannot locate symbol "pthread_cond_clockwait"
+```
+
+**Solution:** Install [MasterDevX/Termux-ADB](https://github.com/MasterDevX/Termux-ADB) and replace adb:
+
+```bash
+# 1. Install compatible adb
+wget https://github.com/MasterDevX/Termux-ADB/raw/master/InstallTools.sh -q && bash InstallTools.sh
+
+# 2. Replace Android SDK's adb with compatible version
+cp $PREFIX/bin/adb.bin $PREFIX/opt/android-sdk/platform-tools/adb
+
+# 3. Verify
+flutter doctor
+```
+
+This installs adb 1.0.39 (android-8.0.0), which works on Android 9 and older devices.
+
+</details>
+
 ---
 
 ## 🚀 Quick Start
