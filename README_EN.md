@@ -46,18 +46,17 @@ This project is based on [mumumusuc/termux-flutter](https://github.com/mumumusuc
 
 ## 🚀 Quick Start
 
-### Install on Termux (Using Pre-built .deb)
+### Install on Termux
 
 ```bash
-# 1. Push .deb to device
-adb push flutter_3.35.0_aarch64.deb /sdcard/Download/
+# 1. Install dependencies
+pkg update && pkg install x11-repo wget
 
-# 2. Install in Termux
-pkg update && pkg install x11-repo
-cp /sdcard/Download/flutter_3.35.0_aarch64.deb ~/
-dpkg -i ~/flutter_3.35.0_aarch64.deb
+# 2. Download package
+wget https://github.com/ImL1s/termux-flutter-wsl/releases/download/v3.35.0/flutter_3.35.0_aarch64.deb
 
-# 3. Verify
+# 3. Install & Verify
+dpkg -i flutter_3.35.0_aarch64.deb
 flutter --version
 ```
 

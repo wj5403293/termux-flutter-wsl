@@ -46,18 +46,17 @@
 
 ## 🚀 快速開始
 
-### 在 Termux 上安裝（使用預編譯包）
+### 在 Termux 上安裝
 
 ```bash
-# 1. 推送 .deb 包到手機
-adb push flutter_3.35.0_aarch64.deb /sdcard/Download/
+# 1. 安裝基礎依賴
+pkg update && pkg install x11-repo wget
 
-# 2. 在 Termux 中執行
-pkg update && pkg install x11-repo
-cp /sdcard/Download/flutter_3.35.0_aarch64.deb ~/
-dpkg -i ~/flutter_3.35.0_aarch64.deb
+# 2. 下載安裝包
+wget https://github.com/ImL1s/termux-flutter-wsl/releases/download/v3.35.0/flutter_3.35.0_aarch64.deb
 
-# 3. 驗證安裝
+# 3. 安裝與驗證
+dpkg -i flutter_3.35.0_aarch64.deb
 flutter --version
 ```
 
