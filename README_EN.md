@@ -20,6 +20,10 @@
   <img src="https://img.shields.io/badge/License-GPL--3.0-blue" alt="License"/>
 </p>
 
+<p align="center">
+  <em>🍴 Forked from <a href="https://github.com/mumumusuc/termux-flutter">mumumusuc/termux-flutter</a></em>
+</p>
+
 ---
 
 ## 📖 Introduction
