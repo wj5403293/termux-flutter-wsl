@@ -36,8 +36,11 @@ This project is based on [mumumusuc/termux-flutter](https://github.com/mumumusuc
 |---|---|---|
 | Build Env | Linux / Termux Native | **WSL (Windows)** |
 | Flutter Ver | 3.29.2 | **3.35.0** |
+| Android Compat | ❌ No Android 14+ | ✅ **Android 16 Tested** |
 | Fixes | - | **`-llog`, `-lm` deps** |
 | Docs | Basic | **Full Guide (EN/ZH)** |
+
+> ✅ **Verified**: Successfully ran Flutter app on Android 16 device!
 
 ### ✨ Features
 
