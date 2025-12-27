@@ -151,6 +151,10 @@ git merge upstream/main
 **注意**：由於我們為 WSL 修改了部分構建腳本，合併時可能會發生衝突，請手動解決。
 
 ---
+
+## 🙏 致謝
+
+- [mumumusuc/termux-flutter](https://github.com/mumumusuc/termux-flutter) - 原始構建工具
 - [Flutter](https://flutter.dev/) - Google 的 UI 框架
 - [Termux](https://termux.com/) - Android 終端模擬器
 

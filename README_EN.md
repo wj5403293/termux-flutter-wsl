@@ -151,6 +151,10 @@ git merge upstream/main
 **Note**: Merge conflicts may occur because we customized build scripts for WSL support. Please resolve conflicts manually.
 
 ---
+
+## 🙏 Acknowledgements
+
+- [mumumusuc/termux-flutter](https://github.com/mumumusuc/termux-flutter) - Original build tools
 - [Flutter](https://flutter.dev/) - Google's UI Toolkit
 - [Termux](https://termux.com/) - Android Terminal Emulator
 
