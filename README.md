@@ -53,11 +53,21 @@
 
 ## 🚀 快速開始
 
-### 在 Termux 上安裝
+### 一鍵安裝（推薦）
+
+在 Termux 中執行以下命令，自動安裝 Flutter + Android SDK：
+
+```bash
+curl -sL https://raw.githubusercontent.com/ImL1s/termux-flutter-wsl/master/install_termux_flutter.sh | bash
+```
+
+> 此腳本會自動安裝 Flutter 3.35.0、Android SDK 35.0.0、JDK 17，並配置環境變數。
+
+### 手動安裝
 
 ```bash
 # 1. 安裝基礎依賴
-pkg update && pkg install x11-repo wget
+pkg update && pkg install x11-repo wget openjdk-17
 
 # 2. 下載安裝包
 wget https://github.com/ImL1s/termux-flutter-wsl/releases/download/v3.35.0/flutter_3.35.0_aarch64.deb

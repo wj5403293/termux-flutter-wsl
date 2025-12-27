@@ -53,11 +53,21 @@ This project is based on [mumumusuc/termux-flutter](https://github.com/mumumusuc
 
 ## 🚀 Quick Start
 
-### Install on Termux
+### One-Click Install (Recommended)
+
+Run this command in Termux to automatically install Flutter + Android SDK:
+
+```bash
+curl -sL https://raw.githubusercontent.com/ImL1s/termux-flutter-wsl/master/install_termux_flutter.sh | bash
+```
+
+> This script automatically installs Flutter 3.35.0, Android SDK 35.0.0, JDK 17, and configures environment variables.
+
+### Manual Install
 
 ```bash
 # 1. Install dependencies
-pkg update && pkg install x11-repo wget
+pkg update && pkg install x11-repo wget openjdk-17
 
 # 2. Download package
 wget https://github.com/ImL1s/termux-flutter-wsl/releases/download/v3.35.0/flutter_3.35.0_aarch64.deb
