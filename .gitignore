@@ -1,0 +1,61 @@
+# =====================================================
+# Termux Flutter .gitignore
+# =====================================================
+
+# ----- 大型構建產物 (不需要版本控制) -----
+termux-flutter/flutter/
+termux-flutter/sysroot/
+termux-flutter/release/
+termux-flutter/*.deb
+termux-flutter/out/
+
+# ----- 臨時文件存檔 -----
+_archive/
+
+# ----- 參考專案 (可選，如果你想保留可註釋掉) -----
+reference_termux_flutter/
+
+# ----- Python 相關 -----
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.eggs/
+*.manifest
+*.spec
+
+# ----- 日誌文件 -----
+*.log
+*.txt
+!README*.txt
+
+# ----- IDE / 編輯器 -----
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ----- 系統文件 -----
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ----- Node.js (如果有) -----
+node_modules/
+
+# ----- 構建工具緩存 -----
+.cache/
+.ninja_log
+.ninja_deps
+
+# ----- depot_tools -----
+termux-flutter/depot_tools/
+
+# ----- 中間產物 -----
+*.o
+*.a
+*.so.*
+*.dSYM/
