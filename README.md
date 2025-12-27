@@ -133,9 +133,18 @@ ldflags = [
 
 ---
 
-## 🙏 致謝
+## 🔄 同步上游更新
 
-- [mumumusuc/termux-flutter](https://github.com/mumumusuc/termux-flutter) - 原始構建工具
+如果你想要獲取原專案 (mumumusuc/termux-flutter) 的最新更新（例如新的 Flutter 版本支援），可以使用我們提供的同步腳本：
+
+```bash
+# 這將會嘗試合併上游的 main 分支到本專案
+./sync_upstream.sh
+```
+
+**注意**：由於我們為了支援 WSL 修改了部分構建腳本（如 `build.py`），同步時可能會發生衝突。如果發生衝突，請手動解決並提交。
+
+---
 - [Flutter](https://flutter.dev/) - Google 的 UI 框架
 - [Termux](https://termux.com/) - Android 終端模擬器
 

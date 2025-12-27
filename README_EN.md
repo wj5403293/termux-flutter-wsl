@@ -133,9 +133,18 @@ ldflags = [
 
 ---
 
-## 🙏 Acknowledgements
+## 🔄 Sync with Upstream
 
-- [mumumusuc/termux-flutter](https://github.com/mumumusuc/termux-flutter) - Original build tools
+To pull the latest updates from the original project (mumumusuc/termux-flutter), use the provided sync script:
+
+```bash
+# This attempts to merge upstream/main into this project
+./sync_upstream.sh
+```
+
+**Note**: Merge conflicts may occur because we customized build scripts (e.g., `build.py`) for WSL support. Please resolve conflicts manually if they arise.
+
+---
 - [Flutter](https://flutter.dev/) - Google's UI Toolkit
 - [Termux](https://termux.com/) - Android Terminal Emulator
 
