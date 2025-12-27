@@ -80,6 +80,31 @@ python3 build.py build --arch=arm64 --mode=debug
 python3 build.py debuild --arch=arm64    # 打包 .deb
 ```
 
+### 運行 Flutter 應用（使用 Termux:X11）
+
+安裝完成後，你需要 [Termux:X11](https://github.com/termux/termux-x11/releases) 來顯示 GUI 應用：
+
+```bash
+# 1. 安裝 Termux:X11 App (從 F-Droid 或 GitHub Releases 下載 APK)
+
+# 2. 在 Termux 中啟動 X11 服務
+export DISPLAY=:0
+termux-x11 :0 >/dev/null 2>&1 &
+
+# 3. 打開 Termux:X11 App (會顯示黑色畫面，這是正常的)
+
+# 4. 創建並運行 Flutter 專案
+flutter create hello_termux
+cd hello_termux
+flutter run -d linux
+```
+
+> 💡 **備選方案**：如果 X11 設置困難，也可以用 Web 模式預覽：
+> ```bash
+> flutter run -d web-server --web-port=8080
+> ```
+> 然後在瀏覽器打開 `http://localhost:8080`
+
 ---
 
 ## 📁 目錄結構

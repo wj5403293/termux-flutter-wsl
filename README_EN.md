@@ -80,6 +80,31 @@ python3 build.py build --arch=arm64 --mode=debug
 python3 build.py debuild --arch=arm64    # Package .deb
 ```
 
+### Run Flutter App (with Termux:X11)
+
+After installation, you need [Termux:X11](https://github.com/termux/termux-x11/releases) to display GUI apps:
+
+```bash
+# 1. Install Termux:X11 App (download APK from F-Droid or GitHub Releases)
+
+# 2. Start X11 server in Termux
+export DISPLAY=:0
+termux-x11 :0 >/dev/null 2>&1 &
+
+# 3. Open Termux:X11 App (black screen is normal initially)
+
+# 4. Create and run Flutter project
+flutter create hello_termux
+cd hello_termux
+flutter run -d linux
+```
+
+> 💡 **Alternative**: If X11 is difficult to set up, use Web mode:
+> ```bash
+> flutter run -d web-server --web-port=8080
+> ```
+> Then open `http://localhost:8080` in browser.
+
 ---
 
 ## 📁 Directory Structure
