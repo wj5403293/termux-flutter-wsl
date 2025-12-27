@@ -82,18 +82,18 @@ python3 build.py debuild --arch=arm64    # Package .deb
 
 ### Run Flutter App (with Termux:X11)
 
-After installation, you need [Termux:X11](https://github.com/termux/termux-x11/releases) to display GUI apps:
+After installation, you need [Termux:X11](https://github.com/termux/termux-x11/releases) to display GUI apps.
+
+**Install Termux:X11**: Download APK from [GitHub Releases](https://github.com/termux/termux-x11/releases) or [F-Droid](https://f-droid.org/packages/com.termux.x11/).
 
 ```bash
-# 1. Install Termux:X11 App (download APK from F-Droid or GitHub Releases)
-
-# 2. Start X11 server in Termux
+# 1. Start X11 server in Termux
 export DISPLAY=:0
 termux-x11 :0 >/dev/null 2>&1 &
 
-# 3. Open Termux:X11 App (black screen is normal initially)
+# 2. Open Termux:X11 App (black screen is normal initially)
 
-# 4. Create and run Flutter project
+# 3. Create and run Flutter project
 flutter create hello_termux
 cd hello_termux
 flutter run -d linux
@@ -104,6 +104,23 @@ flutter run -d linux
 > flutter run -d web-server --web-port=8080
 > ```
 > Then open `http://localhost:8080` in browser.
+
+### Deploy to Android Device
+
+To compile and install APK on Android devices from Termux, install Android SDK:
+
+1. **Install Android SDK**: [termux-android-sdk](https://github.com/mumumusuc/termux-android-sdk/releases)
+2. **Connect ADB device**: [ADB Connection Guide](https://github.com/bdloser404/Fluttermux?tab=readme-ov-file#how-to-connect-adb-devices)
+
+```bash
+# List connected devices
+flutter devices
+
+# Deploy to Android device
+flutter run -d <device_id>
+```
+
+> ⚠️ **Note**: `flutter devices` only shows `linux` by default because Android SDK is not preinstalled. Install `termux-android-sdk` to see Android device options.
 
 ---
 

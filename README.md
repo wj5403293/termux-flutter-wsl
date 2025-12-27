@@ -82,18 +82,18 @@ python3 build.py debuild --arch=arm64    # 打包 .deb
 
 ### 運行 Flutter 應用（使用 Termux:X11）
 
-安裝完成後，你需要 [Termux:X11](https://github.com/termux/termux-x11/releases) 來顯示 GUI 應用：
+安裝完成後，你需要 [Termux:X11](https://github.com/termux/termux-x11/releases) 來顯示 GUI 應用。
+
+**安裝 Termux:X11**：從 [GitHub Releases](https://github.com/termux/termux-x11/releases) 或 [F-Droid](https://f-droid.org/packages/com.termux.x11/) 下載 APK 安裝。
 
 ```bash
-# 1. 安裝 Termux:X11 App (從 F-Droid 或 GitHub Releases 下載 APK)
-
-# 2. 在 Termux 中啟動 X11 服務
+# 1. 在 Termux 中啟動 X11 服務
 export DISPLAY=:0
 termux-x11 :0 >/dev/null 2>&1 &
 
-# 3. 打開 Termux:X11 App (會顯示黑色畫面，這是正常的)
+# 2. 打開 Termux:X11 App (會顯示黑色畫面，這是正常的)
 
-# 4. 創建並運行 Flutter 專案
+# 3. 創建並運行 Flutter 專案
 flutter create hello_termux
 cd hello_termux
 flutter run -d linux
@@ -104,6 +104,23 @@ flutter run -d linux
 > flutter run -d web-server --web-port=8080
 > ```
 > 然後在瀏覽器打開 `http://localhost:8080`
+
+### 部署到 Android 設備
+
+如果你想從 Termux 編譯並安裝 APK 到 Android 設備，需要額外安裝 Android SDK：
+
+1. **安裝 Android SDK**：[termux-android-sdk](https://github.com/mumumusuc/termux-android-sdk/releases)
+2. **連接 ADB 設備**：[ADB 連接教程](https://github.com/bdloser404/Fluttermux?tab=readme-ov-file#how-to-connect-adb-devices)
+
+```bash
+# 查看已連接設備
+flutter devices
+
+# 部署到 Android 設備
+flutter run -d <device_id>
+```
+
+> ⚠️ **注意**：`flutter devices` 預設只顯示 `linux`，因為 Android SDK 不是預裝的。安裝 `termux-android-sdk` 後才會出現 Android 設備選項。
 
 ---
 
