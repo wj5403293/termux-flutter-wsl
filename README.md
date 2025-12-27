@@ -105,12 +105,96 @@ flutter run -d linux
 > ```
 > 然後在瀏覽器打開 `http://localhost:8080`
 
+### 構建 Android APK
+
+要在 Termux 中執行 `flutter build apk`，需要安裝完整的 Android 開發環境。
+
+#### 步驟 1：安裝依賴
+
+```bash
+# 更新套件並安裝 JDK
+pkg update
+pkg install openjdk-17 git wget
+```
+
+#### 步驟 2：安裝 Android SDK
+
+從 [termux-android-sdk](https://github.com/mumumusuc/termux-android-sdk/releases) 下載並安裝：
+
+```bash
+wget https://github.com/mumumusuc/termux-android-sdk/releases/download/35.0.0/android-sdk_35.0.0_aarch64.deb
+dpkg -i android-sdk_35.0.0_aarch64.deb
+```
+
+> 此套件包含 ARM64 原生的 `aapt2`、`build-tools 35.0.0`、`platforms android-34/35` 等必要工具。
+
+#### 步驟 3：配置環境變數
+
+```bash
+# 加入 ~/.bashrc 或 ~/.zshrc
+export ANDROID_HOME=$PREFIX/opt/android-sdk
+export JAVA_HOME=$PREFIX/opt/openjdk
+export PATH=$PATH:$ANDROID_HOME/platform-tools:$ANDROID_HOME/cmdline-tools/latest/bin
+```
+
+重新載入設定：
+```bash
+source ~/.bashrc
+```
+
+#### 步驟 4：配置 Flutter
+
+```bash
+# 設定 Android SDK 路徑
+flutter config --android-sdk $ANDROID_HOME
+
+# 接受 Android 授權
+flutter doctor --android-licenses
+
+# 檢查環境
+flutter doctor
+```
+
+#### 步驟 5：構建 APK
+
+```bash
+# 創建專案
+flutter create myapp
+cd myapp
+
+# 構建 Release APK（針對 ARM64）
+flutter build apk --release --target-platform android-arm64
+
+# APK 輸出位置
+ls build/app/outputs/flutter-apk/
+```
+
 ### 部署到 Android 設備
 
-如果你想從 Termux 編譯並安裝 APK 到 Android 設備，需要額外安裝 Android SDK：
+#### 連接 ADB 設備
 
-1. **安裝 Android SDK**：[termux-android-sdk](https://github.com/mumumusuc/termux-android-sdk/releases)
-2. **連接 ADB 設備**：[ADB 連接教程](https://github.com/bdloser404/Fluttermux?tab=readme-ov-file#how-to-connect-adb-devices)
+**方法 A：無線 ADB（同一台手機）**
+
+1. 開啟手機的「開發者選項」→「無線偵錯」
+2. 點擊「使用配對碼配對裝置」，記下配對碼和端口
+
+```bash
+# 配對（只需一次）
+adb pair 127.0.0.1:<配對端口>
+# 輸入配對碼
+
+# 連接
+adb connect 127.0.0.1:<連接端口>
+```
+
+**方法 B：連接其他設備**
+
+```bash
+# 確保目標設備已開啟 USB 偵錯或無線偵錯
+adb connect <設備IP>:5555
+```
+
+#### 運行應用
 
 ```bash
 # 查看已連接設備
@@ -118,9 +202,12 @@ flutter devices
 
 # 部署到 Android 設備
 flutter run -d <device_id>
+
+# 或直接安裝 APK
+adb install build/app/outputs/flutter-apk/app-release.apk
 ```
 
-> ⚠️ **注意**：`flutter devices` 預設只顯示 `linux`，因為 Android SDK 不是預裝的。安裝 `termux-android-sdk` 後才會出現 Android 設備選項。
+> ⚠️ **注意**：`flutter devices` 預設只顯示 `linux`。安裝 `termux-android-sdk` 後才會出現 Android 設備選項。
 
 ---
 

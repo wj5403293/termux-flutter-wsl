@@ -105,12 +105,96 @@ flutter run -d linux
 > ```
 > Then open `http://localhost:8080` in browser.
 
+### Build Android APK
+
+To run `flutter build apk` in Termux, you need the full Android development environment.
+
+#### Step 1: Install Dependencies
+
+```bash
+# Update packages and install JDK
+pkg update
+pkg install openjdk-17 git wget
+```
+
+#### Step 2: Install Android SDK
+
+Download and install from [termux-android-sdk](https://github.com/mumumusuc/termux-android-sdk/releases):
+
+```bash
+wget https://github.com/mumumusuc/termux-android-sdk/releases/download/35.0.0/android-sdk_35.0.0_aarch64.deb
+dpkg -i android-sdk_35.0.0_aarch64.deb
+```
+
+> This package includes native ARM64 `aapt2`, `build-tools 35.0.0`, `platforms android-34/35`, and other essential tools.
+
+#### Step 3: Configure Environment Variables
+
+```bash
+# Add to ~/.bashrc or ~/.zshrc
+export ANDROID_HOME=$PREFIX/opt/android-sdk
+export JAVA_HOME=$PREFIX/opt/openjdk
+export PATH=$PATH:$ANDROID_HOME/platform-tools:$ANDROID_HOME/cmdline-tools/latest/bin
+```
+
+Reload configuration:
+```bash
+source ~/.bashrc
+```
+
+#### Step 4: Configure Flutter
+
+```bash
+# Set Android SDK path
+flutter config --android-sdk $ANDROID_HOME
+
+# Accept Android licenses
+flutter doctor --android-licenses
+
+# Check environment
+flutter doctor
+```
+
+#### Step 5: Build APK
+
+```bash
+# Create project
+flutter create myapp
+cd myapp
+
+# Build Release APK (for ARM64)
+flutter build apk --release --target-platform android-arm64
+
+# APK output location
+ls build/app/outputs/flutter-apk/
+```
+
 ### Deploy to Android Device
 
-To compile and install APK on Android devices from Termux, install Android SDK:
+#### Connect ADB Device
 
-1. **Install Android SDK**: [termux-android-sdk](https://github.com/mumumusuc/termux-android-sdk/releases)
-2. **Connect ADB device**: [ADB Connection Guide](https://github.com/bdloser404/Fluttermux?tab=readme-ov-file#how-to-connect-adb-devices)
+**Method A: Wireless ADB (Same Phone)**
+
+1. Enable "Developer Options" → "Wireless Debugging" on your phone
+2. Tap "Pair device with pairing code", note the pairing code and port
+
+```bash
+# Pair (only once)
+adb pair 127.0.0.1:<pairing_port>
+# Enter pairing code
+
+# Connect
+adb connect 127.0.0.1:<connect_port>
+```
+
+**Method B: Connect to Other Devices**
+
+```bash
+# Ensure target device has USB debugging or wireless debugging enabled
+adb connect <device_ip>:5555
+```
+
+#### Run App
 
 ```bash
 # List connected devices
@@ -118,9 +202,12 @@ flutter devices
 
 # Deploy to Android device
 flutter run -d <device_id>
+
+# Or install APK directly
+adb install build/app/outputs/flutter-apk/app-release.apk
 ```
 
-> ⚠️ **Note**: `flutter devices` only shows `linux` by default because Android SDK is not preinstalled. Install `termux-android-sdk` to see Android device options.
+> ⚠️ **Note**: `flutter devices` only shows `linux` by default. Install `termux-android-sdk` to see Android device options.
 
 ---
 
