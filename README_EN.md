@@ -42,6 +42,14 @@ This project is based on [mumumusuc/termux-flutter](https://github.com/mumumusuc
 
 > ✅ **Verified**: Successfully ran Flutter app on Android 16 device!
 
+### 📊 Feature Status
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Flutter SDK (Linux) | ✅ Complete | `flutter run -d linux` works |
+| gen_snapshot (ARM64) | ✅ Complete | Cross-compiled, outputs `android_arm64` on Termux |
+| flutter build apk | ✅ Complete | Requires ARM64 NDK (see instructions below) |
+
 ### ✨ Features
 
 - 🪟 Cross-compile entirely within Windows WSL
@@ -168,8 +176,10 @@ Download and install from [termux-android-sdk](https://github.com/mumumusuc/term
 
 ```bash
 wget https://github.com/mumumusuc/termux-android-sdk/releases/download/35.0.0/android-sdk_35.0.0_aarch64.deb
-dpkg -i android-sdk_35.0.0_aarch64.deb
+dpkg -i --force-architecture android-sdk_35.0.0_aarch64.deb
 ```
+
+> ⚠️ **Note**: The `--force-architecture` flag is required because dpkg treats `aarch64` and `arm64` as different architectures.
 
 > This package includes native ARM64 `aapt2`, `build-tools 35.0.0`, `platforms android-34/35`, and other essential tools.
 
@@ -178,8 +188,11 @@ dpkg -i android-sdk_35.0.0_aarch64.deb
 ```bash
 # Add to ~/.bashrc or ~/.zshrc
 export ANDROID_HOME=$PREFIX/opt/android-sdk
-export JAVA_HOME=$PREFIX/opt/openjdk
 export PATH=$PATH:$ANDROID_HOME/platform-tools:$ANDROID_HOME/cmdline-tools/latest/bin
+
+# Important: Do NOT set JAVA_HOME, let Gradle find Java from PATH
+# If already set, unset it:
+unset JAVA_HOME
 ```
 
 Reload configuration:
@@ -200,19 +213,94 @@ flutter doctor --android-licenses
 flutter doctor
 ```
 
-#### Step 5: Build APK
+#### Step 5: Install ARM64 NDK (Critical Step)
+
+The official Android NDK only provides x86_64 Linux host binaries, which cannot run on ARM64 Termux. You need to install a third-party prebuilt ARM64 NDK:
+
+```bash
+# Download ARM64 NDK (~538MB)
+cd ~
+wget https://github.com/AntonioCiolworker/ArmDroid-NDK/releases/download/android-ndk/android-ndk-r27b-aarch64.zip
+
+# Extract to Android SDK's NDK directory
+mkdir -p $ANDROID_HOME/ndk
+unzip android-ndk-r27b-aarch64.zip -d $ANDROID_HOME/ndk/
+
+# Rename to standard version number (required by Flutter)
+mv $ANDROID_HOME/ndk/android-ndk-r27b $ANDROID_HOME/ndk/27.1.12297006
+
+# Verify installation
+ls $ANDROID_HOME/ndk/27.1.12297006/toolchains/llvm/prebuilt/linux-aarch64/bin/clang
+```
+
+> ✅ **Verified**: The ARM64 NDK contains a complete `linux-aarch64` toolchain with clang 18.0.2.
+
+> 💡 **Source**: [lzhiyong/termux-ndk](https://github.com/lzhiyong/termux-ndk) - Provides prebuilt ARM64 Android NDK.
+
+#### Step 6: Configure AAPT2
+
+Building APK on Termux requires native ARM64 AAPT2:
+
+```bash
+# Install Termux native aapt2
+pkg install aapt2
+
+# Add to your project's android/gradle.properties:
+echo "android.aapt2FromMavenOverride=$PREFIX/bin/aapt2" >> android/gradle.properties
+```
+
+#### Step 7: Configure Gradle (Important)
+
+**Option A: Use One-Click Configuration Script (Recommended)**
+
+```bash
+# Run in your project directory
+curl -sL https://raw.githubusercontent.com/ImL1s/termux-flutter-wsl/master/setup_flutter_project.sh | bash
+```
+
+**Option B: Manual Configuration**
+
+Add required settings to your project's `android/gradle.properties`:
+
+```bash
+cat >> android/gradle.properties << 'EOF'
+android.useAndroidX=true
+android.enableJetifier=true
+android.aapt2FromMavenOverride=/data/data/com.termux/files/usr/bin/aapt2
+org.gradle.jvmargs=-Xmx768m -XX:MaxMetaspaceSize=384m
+EOF
+```
+
+Also specify the NDK version in `android/app/build.gradle.kts`:
+
+```kotlin
+android {
+    ndkVersion = "27.1.12297006"
+    // ... other settings
+}
+```
+
+#### Step 8: Build APK
 
 ```bash
 # Create project
 flutter create myapp
 cd myapp
 
-# Build Release APK (for ARM64)
-flutter build apk --release --target-platform android-arm64
+# Build Debug APK
+flutter build apk --debug
 
-# APK output location
-ls build/app/outputs/flutter-apk/
+# Or build Release APK
+flutter build apk --release
 ```
+
+> ✅ **Verified**: With the above configuration, `flutter build apk` runs successfully on Termux!
+>
+> Example output:
+> ```
+> Running Gradle task 'assembleDebug'...                            194.6s
+> ✓ Built build/app/outputs/flutter-apk/app-debug.apk (70MB)
+> ```
 
 ### Deploy to Android Device
 
@@ -260,14 +348,16 @@ adb install build/app/outputs/flutter-apk/app-release.apk
 
 ```
 termux-flutter-wsl/
-├── build.py              # Main build script
-├── build.toml            # Configuration
-├── patches/              # Engine patches
-├── build_termux_flutter.sh  # One-click build
-├── README.md             # Chinese docs
-├── README_EN.md          # English docs
-├── assets/               # Assets
-└── .agent/workflows/     # Automation
+├── build.py                  # Main build script
+├── build.toml                # Configuration
+├── patches/                  # Engine patches
+├── build_termux_flutter.sh   # One-click build (WSL)
+├── install_termux_flutter.sh # Termux one-click installer
+├── setup_flutter_project.sh  # Project configuration script
+├── README.md                 # Chinese docs
+├── README_EN.md              # English docs
+├── assets/                   # Assets
+└── .agent/workflows/         # Automation
 ```
 
 ---
@@ -296,6 +386,29 @@ ldflags = [
   "-lm",     # Added: Math lib
 ]
 ```
+
+### Android gen_snapshot Cross-Compilation
+
+To support `flutter build apk --release` (AOT compilation) on Termux, we cross-compiled a specialized gen_snapshot:
+
+```bash
+# Build in WSL (for developers)
+python3 build.py configure_android --arch=arm64 --mode=release
+python3 build.py build_android_gen_snapshot --arch=arm64 --mode=release
+```
+
+This gen_snapshot:
+- **Runs on** ARM64 Termux
+- **Produces** Android ARM64 AOT machine code
+- **Included** in the `flutter_3.35.0_aarch64.deb` package
+
+> ✅ **Verified**: gen_snapshot runs successfully on Termux:
+> ```
+> $ gen_snapshot --version
+> Dart SDK version: 3.9.0 on "android_arm64"
+> ```
+
+**Technical Note**: The official Flutter SDK's gen_snapshot only runs on x86_64 Linux. We used NDK to cross-compile a version that runs natively on ARM64 Android (Termux), which is essential for `flutter build apk`.
 
 ---
 
@@ -329,6 +442,7 @@ git merge upstream/main
 ## 🙏 Acknowledgements
 
 - [mumumusuc/termux-flutter](https://github.com/mumumusuc/termux-flutter) - Original build tools
+- [lzhiyong/termux-ndk](https://github.com/lzhiyong/termux-ndk) - Prebuilt ARM64 Android NDK
 - [Flutter](https://flutter.dev/) - Google's UI Toolkit
 - [Termux](https://termux.com/) - Android Terminal Emulator
 

@@ -42,6 +42,14 @@
 
 > ✅ **已驗證**：本專案已在 Android 16 設備上成功運行 Flutter 應用！
 
+### 📊 功能狀態
+
+| 功能 | 狀態 | 說明 |
+|------|------|------|
+| Flutter SDK (Linux) | ✅ 完成 | `flutter run -d linux` 可正常運行 |
+| gen_snapshot (ARM64) | ✅ 完成 | 交叉編譯成功，在 Termux 上輸出 `android_arm64` |
+| flutter build apk | ✅ 完成 | 需安裝 ARM64 NDK（見下方說明） |
+
 ### ✨ 主要特色
 
 - 🪟 在 Windows WSL 環境下完成交叉編譯
@@ -168,8 +176,10 @@ pkg install openjdk-17 git wget
 
 ```bash
 wget https://github.com/mumumusuc/termux-android-sdk/releases/download/35.0.0/android-sdk_35.0.0_aarch64.deb
-dpkg -i android-sdk_35.0.0_aarch64.deb
+dpkg -i --force-architecture android-sdk_35.0.0_aarch64.deb
 ```
+
+> ⚠️ **注意**：需要 `--force-architecture` 參數，因為 dpkg 將 `aarch64` 和 `arm64` 視為不同架構。
 
 > 此套件包含 ARM64 原生的 `aapt2`、`build-tools 35.0.0`、`platforms android-34/35` 等必要工具。
 
@@ -178,8 +188,11 @@ dpkg -i android-sdk_35.0.0_aarch64.deb
 ```bash
 # 加入 ~/.bashrc 或 ~/.zshrc
 export ANDROID_HOME=$PREFIX/opt/android-sdk
-export JAVA_HOME=$PREFIX/opt/openjdk
 export PATH=$PATH:$ANDROID_HOME/platform-tools:$ANDROID_HOME/cmdline-tools/latest/bin
+
+# 重要：不要設置 JAVA_HOME，讓 Gradle 自動從 PATH 找到 Java
+# 如果已設置，請取消：
+unset JAVA_HOME
 ```
 
 重新載入設定：
@@ -200,19 +213,94 @@ flutter doctor --android-licenses
 flutter doctor
 ```
 
-#### 步驟 5：構建 APK
+#### 步驟 5：安裝 ARM64 NDK（關鍵步驟）
+
+官方 Android NDK 只提供 x86_64 Linux 主機版本，無法在 ARM64 Termux 上運行。需要安裝第三方預編譯的 ARM64 NDK：
+
+```bash
+# 下載 ARM64 NDK（約 538MB）
+cd ~
+wget https://github.com/AntonioCiolworker/ArmDroid-NDK/releases/download/android-ndk/android-ndk-r27b-aarch64.zip
+
+# 解壓到 Android SDK 的 NDK 目錄
+mkdir -p $ANDROID_HOME/ndk
+unzip android-ndk-r27b-aarch64.zip -d $ANDROID_HOME/ndk/
+
+# 重命名為標準版本號（Flutter 需要）
+mv $ANDROID_HOME/ndk/android-ndk-r27b $ANDROID_HOME/ndk/27.1.12297006
+
+# 驗證安裝
+ls $ANDROID_HOME/ndk/27.1.12297006/toolchains/llvm/prebuilt/linux-aarch64/bin/clang
+```
+
+> ✅ **已驗證**：ARM64 NDK 包含完整的 `linux-aarch64` 工具鏈，clang 18.0.2 可正常運行。
+
+> 💡 **來源**：[lzhiyong/termux-ndk](https://github.com/lzhiyong/termux-ndk) - 提供 ARM64 預編譯的 Android NDK。
+
+#### 步驟 6：配置 AAPT2
+
+在 Termux 上構建 APK 需要使用原生 ARM64 的 AAPT2：
+
+```bash
+# 安裝 Termux 原生 aapt2
+pkg install aapt2
+
+# 在專案的 android/gradle.properties 中添加：
+echo "android.aapt2FromMavenOverride=$PREFIX/bin/aapt2" >> android/gradle.properties
+```
+
+#### 步驟 7：配置 Gradle（重要）
+
+**方法 A：使用一鍵配置腳本（推薦）**
+
+```bash
+# 在專案目錄中執行
+curl -sL https://raw.githubusercontent.com/ImL1s/termux-flutter-wsl/master/setup_flutter_project.sh | bash
+```
+
+**方法 B：手動配置**
+
+在專案的 `android/gradle.properties` 中添加必要設定：
+
+```bash
+cat >> android/gradle.properties << 'EOF'
+android.useAndroidX=true
+android.enableJetifier=true
+android.aapt2FromMavenOverride=/data/data/com.termux/files/usr/bin/aapt2
+org.gradle.jvmargs=-Xmx768m -XX:MaxMetaspaceSize=384m
+EOF
+```
+
+同時在 `android/app/build.gradle.kts` 中指定 NDK 版本：
+
+```kotlin
+android {
+    ndkVersion = "27.1.12297006"
+    // ... 其他設定
+}
+```
+
+#### 步驟 8：構建 APK
 
 ```bash
 # 創建專案
 flutter create myapp
 cd myapp
 
-# 構建 Release APK（針對 ARM64）
-flutter build apk --release --target-platform android-arm64
+# 構建 Debug APK
+flutter build apk --debug
 
-# APK 輸出位置
-ls build/app/outputs/flutter-apk/
+# 或構建 Release APK
+flutter build apk --release
 ```
+
+> ✅ **已驗證**：使用上述配置，`flutter build apk` 已在 Termux 上成功運行！
+>
+> 輸出示例：
+> ```
+> Running Gradle task 'assembleDebug'...                            194.6s
+> ✓ Built build/app/outputs/flutter-apk/app-debug.apk (70MB)
+> ```
 
 ### 部署到 Android 設備
 
@@ -260,14 +348,16 @@ adb install build/app/outputs/flutter-apk/app-release.apk
 
 ```
 termux-flutter-wsl/
-├── build.py              # 主構建腳本
-├── build.toml            # 構建配置
-├── patches/              # 引擎補丁
-├── build_termux_flutter.sh  # 一鍵構建腳本
-├── README.md             # 中文文檔
-├── README_EN.md          # 英文文檔
-├── assets/               # 專案資源
-└── .agent/workflows/     # 自動化工作流
+├── build.py                  # 主構建腳本
+├── build.toml                # 構建配置
+├── patches/                  # 引擎補丁
+├── build_termux_flutter.sh   # 一鍵構建腳本 (WSL)
+├── install_termux_flutter.sh # Termux 一鍵安裝腳本
+├── setup_flutter_project.sh  # 專案配置腳本
+├── README.md                 # 中文文檔
+├── README_EN.md              # 英文文檔
+├── assets/                   # 專案資源
+└── .agent/workflows/         # 自動化工作流
 ```
 
 ---
@@ -296,6 +386,29 @@ ldflags = [
   "-lm",     # 新增：數學庫
 ]
 ```
+
+### Android gen_snapshot 交叉編譯
+
+為了支援在 Termux 上執行 `flutter build apk --release`（AOT 編譯），我們交叉編譯了專用的 gen_snapshot：
+
+```bash
+# 在 WSL 中構建（開發者使用）
+python3 build.py configure_android --arch=arm64 --mode=release
+python3 build.py build_android_gen_snapshot --arch=arm64 --mode=release
+```
+
+這個 gen_snapshot 的特點：
+- **運行在** ARM64 Termux 上
+- **產生** Android ARM64 AOT 機器碼
+- **已包含** 在 `flutter_3.35.0_aarch64.deb` 安裝包中
+
+> ✅ **已驗證**：gen_snapshot 在 Termux 上成功運行：
+> ```
+> $ gen_snapshot --version
+> Dart SDK version: 3.9.0 on "android_arm64"
+> ```
+
+**技術說明**：官方 Flutter SDK 的 gen_snapshot 只能在 x86_64 Linux 上運行。我們使用 NDK 交叉編譯了一個能在 ARM64 Android (Termux) 上原生運行的版本，這是實現 `flutter build apk` 的關鍵。
 
 ---
 
@@ -329,6 +442,7 @@ git merge upstream/main
 ## 🙏 致謝
 
 - [mumumusuc/termux-flutter](https://github.com/mumumusuc/termux-flutter) - 原始構建工具
+- [lzhiyong/termux-ndk](https://github.com/lzhiyong/termux-ndk) - ARM64 預編譯 Android NDK
 - [Flutter](https://flutter.dev/) - Google 的 UI 框架
 - [Termux](https://termux.com/) - Android 終端模擬器
 
