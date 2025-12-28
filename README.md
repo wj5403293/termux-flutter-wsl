@@ -311,7 +311,18 @@ flutter build apk --release --target-platform android-arm64
 ```
 
 > ⚠️ **重要參數說明**：
-> - `--target-platform android-arm64`：只構建 ARM64 架構（我們只編譯了 arm64 的 gen_snapshot）
+> - `--target-platform android-arm64`：**必需！** 只構建 ARM64 架構
+>
+> **為什麼需要這個參數？**
+> Flutter 預設會構建 arm、arm64、x64 三種架構。每種架構需要對應的 gen_snapshot（AOT 編譯器）：
+> - `android-arm` 需要 `android-arm-release/linux-arm64/gen_snapshot`
+> - `android-arm64` 需要 `android-arm64-release/linux-arm64/gen_snapshot` ✅ 已包含
+> - `android-x64` 需要 `android-x64-release/linux-arm64/gen_snapshot`
+>
+> 由於 Dart VM 的交叉編譯限制，目前只能成功編譯 android-arm64 的 gen_snapshot。
+> 因此必須使用 `--target-platform android-arm64` 來跳過其他架構。
+>
+> 💡 **影響範圍**：產出的 APK 只能在 ARM64 設備上運行。大多數現代 Android 設備（2019 年後）都是 ARM64。
 
 > ✅ **已驗證**：使用上述配置，`flutter build apk --release` 已在 Termux 上成功運行！
 >

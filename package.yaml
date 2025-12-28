@@ -156,9 +156,11 @@ resource:
     mode: 0o644
 
   # Android gen_snapshot for building APKs on Termux
-  # These gen_snapshots run on ARM64 Termux and produce Android AOT code
-
-  # ARM64 target (most common)
+  # This gen_snapshot runs on ARM64 Termux and produces Android ARM64 AOT code
+  #
+  # Note: Only android-arm64 is supported due to Dart VM cross-compilation
+  # limitations. Users must use --target-platform android-arm64 when building APKs.
+  # See README.md for details.
   android_gen_snapshot_arm64:
     source:
       - $android_out/clang_arm64/gen_snapshot
@@ -167,26 +169,4 @@ resource:
     define:
       eng: *eng
       android_out: f'{root}/engine/src/out/android_release_arm64'
-    mode: 0o755
-
-  # ARM (32-bit) target
-  android_gen_snapshot_arm:
-    source:
-      - $android_out/clang_arm64/gen_snapshot
-    output:
-      - $eng/android-arm-release/linux-$arch
-    define:
-      eng: *eng
-      android_out: f'{root}/engine/src/out/android_release_arm'
-    mode: 0o755
-
-  # x64 target (emulators, Chrome OS)
-  android_gen_snapshot_x64:
-    source:
-      - $android_out/clang_arm64/gen_snapshot
-    output:
-      - $eng/android-x64-release/linux-$arch
-    define:
-      eng: *eng
-      android_out: f'{root}/engine/src/out/android_release_x64'
     mode: 0o755

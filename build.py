@@ -405,7 +405,12 @@ class Build:
 
         This builds everything needed for both:
         - flutter run -d linux (Linux target)
-        - flutter build apk --release (Android target, all architectures)
+        - flutter build apk --release --target-platform android-arm64
+
+        Note: Only android-arm64 gen_snapshot is built. Users must use
+        --target-platform android-arm64 when building APKs. This is due to
+        Dart VM cross-compilation limitations that prevent building
+        gen_snapshot for android-arm and android-x64 targets.
 
         Usage:
             python3 build.py build_all --arch=arm64
@@ -413,33 +418,36 @@ class Build:
         logger.info('=== Starting complete Flutter Termux build ===')
 
         # Step 1: Build Linux debug (for flutter run -d linux)
-        logger.info('[1/9] Configuring Linux debug...')
+        logger.info('[1/7] Configuring Linux debug...')
         self.configure(arch=arch, mode='debug')
 
-        logger.info('[2/9] Building Flutter engine + dart...')
+        logger.info('[2/7] Building Flutter engine + dart...')
         self.build(arch=arch, mode='debug', jobs=jobs)
         self.build_dart(arch=arch, mode='debug', jobs=jobs)
 
         # Step 3: Build impellerc (for shader compilation)
-        logger.info('[3/9] Building impellerc...')
+        logger.info('[3/7] Building impellerc...')
         self.build_impellerc(arch=arch, mode='debug', jobs=jobs)
 
         # Step 4: Build const_finder (for icon tree shaking)
-        logger.info('[4/9] Building const_finder...')
+        logger.info('[4/7] Building const_finder...')
         self.build_const_finder(arch=arch, mode='debug', jobs=jobs)
 
-        # Step 5-7: Build Android gen_snapshot for all architectures
-        for android_arch in ['arm64', 'arm', 'x64']:
-            logger.info(f'[{5 + ["arm64", "arm", "x64"].index(android_arch)}/9] Building Android gen_snapshot ({android_arch})...')
-            self.configure_android(arch=android_arch, mode='release')
-            self.build_android_gen_snapshot(arch=android_arch, mode='release', jobs=jobs)
+        # Step 5: Build Android gen_snapshot (only arm64 supported)
+        # Due to Dart VM cross-compilation limitations, we can only build
+        # gen_snapshot for android-arm64. android-arm and android-x64 require
+        # patching the Dart VM signal handler code.
+        logger.info('[5/7] Building Android gen_snapshot (arm64 only)...')
+        self.configure_android(arch='arm64', mode='release')
+        self.build_android_gen_snapshot(arch='arm64', mode='release', jobs=jobs)
 
-        # Step 8: Package deb
-        logger.info('[8/9] Packaging deb...')
+        # Step 6: Package deb
+        logger.info('[6/7] Packaging deb...')
         self.debuild(arch=arch, output=self.output(arch))
 
-        logger.info('[9/9] Build complete!')
+        logger.info('[7/7] Build complete!')
         logger.info(f'Output: {self.output(arch)}')
+        logger.info('Note: Users must use --target-platform android-arm64 when building APKs')
 
     # TODO: check gclient and ninja existence
     def __call__(self):

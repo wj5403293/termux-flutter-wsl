@@ -331,7 +331,18 @@ flutter build apk --debug --target-platform android-arm64
 ```
 
 > **Important flags explained**:
-> - `--target-platform android-arm64`: Build ARM64 only, skip arm and x64 (avoids needing extra gen_snapshot)
+> - `--target-platform android-arm64`: **Required!** Build ARM64 only
+>
+> **Why is this flag required?**
+> Flutter by default builds arm, arm64, and x64 architectures. Each architecture needs its corresponding gen_snapshot (AOT compiler):
+> - `android-arm` needs `android-arm-release/linux-arm64/gen_snapshot`
+> - `android-arm64` needs `android-arm64-release/linux-arm64/gen_snapshot` ✅ Included
+> - `android-x64` needs `android-x64-release/linux-arm64/gen_snapshot`
+>
+> Due to Dart VM cross-compilation limitations, only the android-arm64 gen_snapshot can be successfully compiled.
+> Therefore, you must use `--target-platform android-arm64` to skip other architectures.
+>
+> 💡 **Impact**: The output APK will only run on ARM64 devices. Most modern Android devices (2019+) are ARM64.
 
 > ✅ **Verified**: With the above configuration, `flutter build apk --release` runs successfully on Termux!
 >

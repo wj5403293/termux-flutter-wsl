@@ -220,7 +220,7 @@ index 0000000..8208b13
 +      "-stdlib=libstdc++",
 +      "-Wl,--warn-shared-textrel"
 +    ]
-+    lib_dirs = [ "$custom_toolchain/lib/clang/18/lib/linux/" ]
++    lib_dirs = [ "$custom_toolchain/lib/clang/19/lib/linux/" ]
 +    include_dirs = [
 +      "//flutter/third_party/libcxx/include",
 +      "//flutter/third_party/libcxxabi/include",
