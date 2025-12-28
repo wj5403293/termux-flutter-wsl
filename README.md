@@ -307,12 +307,11 @@ flutter create myapp
 cd myapp
 
 # 構建 Release APK（必須使用這些參數）
-flutter build apk --release --target-platform android-arm64 --no-tree-shake-icons
+flutter build apk --release --target-platform android-arm64
 ```
 
 > ⚠️ **重要參數說明**：
 > - `--target-platform android-arm64`：只構建 ARM64 架構（我們只編譯了 arm64 的 gen_snapshot）
-> - `--no-tree-shake-icons`：跳過圖標優化（避免需要 const_finder.dart.snapshot）
 
 > ✅ **已驗證**：使用上述配置，`flutter build apk --release` 已在 Termux 上成功運行！
 >
@@ -337,7 +336,7 @@ echo "ndk.dir=$ANDROID_HOME/ndk/27.1.12297006" >> android/local.properties
 sed -i 's/ndkVersion = flutter.ndkVersion/ndkVersion = "27.1.12297006"/g' android/app/build.gradle.kts
 
 # 3. 首次構建（會失敗，但會下載必要工具）
-flutter build apk --release --target-platform android-arm64 --no-tree-shake-icons 2>&1 || true
+flutter build apk --release --target-platform android-arm64 2>&1 || true
 
 # 4. 修復 CMake
 rm -rf $ANDROID_HOME/cmake/*/bin
@@ -358,7 +357,7 @@ cp -r $FLUTTER_ROOT/bin/cache/artifacts/engine/common/flutter_patched_sdk/* \
       $FLUTTER_ROOT/bin/cache/artifacts/engine/common/flutter_patched_sdk_product/
 
 # 7. 再次構建（應該成功）
-flutter build apk --release --target-platform android-arm64 --no-tree-shake-icons
+flutter build apk --release --target-platform android-arm64
 ```
 
 </details>

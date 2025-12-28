@@ -324,7 +324,7 @@ cd myapp
 # Add: ndkVersion = "27.1.12297006"
 
 # Build Release APK (ARM64 only, skip unsupported architectures)
-flutter build apk --release --target-platform android-arm64 --no-tree-shake-icons
+flutter build apk --release --target-platform android-arm64
 
 # Build Debug APK
 flutter build apk --debug --target-platform android-arm64
@@ -332,7 +332,6 @@ flutter build apk --debug --target-platform android-arm64
 
 > **Important flags explained**:
 > - `--target-platform android-arm64`: Build ARM64 only, skip arm and x64 (avoids needing extra gen_snapshot)
-> - `--no-tree-shake-icons`: Skip icon optimization (avoids needing const_finder.dart.snapshot)
 
 > ✅ **Verified**: With the above configuration, `flutter build apk --release` runs successfully on Termux!
 >

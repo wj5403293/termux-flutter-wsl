@@ -264,12 +264,11 @@ export ANDROID_SDK_ROOT=$ANDROID_HOME
 export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools
 
 cd your_flutter_project
-flutter build apk --release --target-platform android-arm64 --no-tree-shake-icons
+flutter build apk --release --target-platform android-arm64
 ```
 
 ### 注意事項
 
 - `--target-platform android-arm64`：只構建 ARM64，跳過 arm 和 x64（避免需要額外的 gen_snapshot）
-- `--no-tree-shake-icons`：跳過圖標優化（避免需要 const_finder.dart.snapshot）
 - 首次構建需要下載 Gradle 依賴，約需 5-10 分鐘
 - APK 輸出在 `build/app/outputs/flutter-apk/app-release.apk`

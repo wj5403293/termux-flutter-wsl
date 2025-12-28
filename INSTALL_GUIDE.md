@@ -146,7 +146,7 @@ android {
 
 ```bash
 # Release APK（只構建 ARM64，跳過不支援的架構）
-flutter build apk --release --target-platform android-arm64 --no-tree-shake-icons
+flutter build apk --release --target-platform android-arm64
 
 # Debug APK
 flutter build apk --debug --target-platform android-arm64
@@ -154,7 +154,6 @@ flutter build apk --debug --target-platform android-arm64
 
 > ⚠️ **重要標記說明**：
 > - `--target-platform android-arm64`：只構建 ARM64，跳過 arm 和 x64（避免需要額外的 gen_snapshot）
-> - `--no-tree-shake-icons`：跳過圖標優化（避免需要 const_finder.dart.snapshot）
 
 ## 驗證安裝
 
