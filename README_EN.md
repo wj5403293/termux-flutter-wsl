@@ -337,24 +337,17 @@ cd myapp
 # Configure NDK version in android/app/build.gradle.kts
 # Add: ndkVersion = "27.1.12297006"
 
-# Build Release APK (ARM64 only, skip unsupported architectures)
-flutter build apk --release --target-platform android-arm64
+# Build Release APK (no extra flags needed!)
+flutter build apk --release
 
 # Build Debug APK
-flutter build apk --debug --target-platform android-arm64
+flutter build apk --debug
 ```
 
-> **Important flags explained**:
-> - `--target-platform android-arm64`: **Required!** Build ARM64 only
+> ✨ **No `--target-platform` flag needed!**
 >
-> **Why is this flag required?**
-> Flutter by default builds arm, arm64, and x64 architectures. Each architecture needs its corresponding gen_snapshot (AOT compiler):
-> - `android-arm` needs `android-arm-release/linux-arm64/gen_snapshot`
-> - `android-arm64` needs `android-arm64-release/linux-arm64/gen_snapshot` ✅ Included
-> - `android-x64` needs `android-x64-release/linux-arm64/gen_snapshot`
->
-> Due to Dart VM cross-compilation limitations, only the android-arm64 gen_snapshot can be successfully compiled.
-> Therefore, you must use `--target-platform android-arm64` to skip other architectures.
+> We have patched the Flutter SDK defaults to only build `android-arm64` architecture.
+> This is because gen_snapshot for android-arm and android-x64 cannot be cross-compiled on ARM64 hosts.
 >
 > 💡 **Impact**: The output APK will only run on ARM64 devices. Most modern Android devices (2019+) are ARM64.
 

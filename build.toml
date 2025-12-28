@@ -26,6 +26,10 @@ path = 'engine/src/flutter/third_party/dart'
 file = './patches/skia.patch'
 path = 'engine/src/flutter/third_party/skia'
 
+[patch.flutter_sdk]
+file = './patches/flutter_sdk_arm64_default.patch'
+path = '.'
+
 [sysroot]
 path = './sysroot'
 

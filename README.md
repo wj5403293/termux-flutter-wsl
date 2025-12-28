@@ -320,21 +320,14 @@ android {
 flutter create myapp
 cd myapp
 
-# 構建 Release APK（必須使用這些參數）
-flutter build apk --release --target-platform android-arm64
+# 構建 Release APK（無需額外參數！）
+flutter build apk --release
 ```
 
-> ⚠️ **重要參數說明**：
-> - `--target-platform android-arm64`：**必需！** 只構建 ARM64 架構
+> ✨ **無需 `--target-platform` 參數！**
 >
-> **為什麼需要這個參數？**
-> Flutter 預設會構建 arm、arm64、x64 三種架構。每種架構需要對應的 gen_snapshot（AOT 編譯器）：
-> - `android-arm` 需要 `android-arm-release/linux-arm64/gen_snapshot`
-> - `android-arm64` 需要 `android-arm64-release/linux-arm64/gen_snapshot` ✅ 已包含
-> - `android-x64` 需要 `android-x64-release/linux-arm64/gen_snapshot`
->
-> 由於 Dart VM 的交叉編譯限制，目前只能成功編譯 android-arm64 的 gen_snapshot。
-> 因此必須使用 `--target-platform android-arm64` 來跳過其他架構。
+> 我們已修改 Flutter SDK 預設值，自動只編譯 `android-arm64` 架構。
+> 這是因為 android-arm 和 android-x64 的 gen_snapshot 無法在 ARM64 上交叉編譯。
 >
 > 💡 **影響範圍**：產出的 APK 只能在 ARM64 設備上運行。大多數現代 Android 設備（2019 年後）都是 ARM64。
 
@@ -382,7 +375,7 @@ echo "ndk.dir=$ANDROID_HOME/ndk/27.1.12297006" >> android/local.properties
 sed -i 's/ndkVersion = flutter.ndkVersion/ndkVersion = "27.1.12297006"/g' android/app/build.gradle.kts
 
 # 3. 首次構建（會失敗，但會下載必要工具）
-flutter build apk --release --target-platform android-arm64 2>&1 || true
+flutter build apk --release 2>&1 || true
 
 # 4. 修復 CMake
 rm -rf $ANDROID_HOME/cmake/*/bin
@@ -403,7 +396,7 @@ cp -r $FLUTTER_ROOT/bin/cache/artifacts/engine/common/flutter_patched_sdk/* \
       $FLUTTER_ROOT/bin/cache/artifacts/engine/common/flutter_patched_sdk_product/
 
 # 7. 再次構建（應該成功）
-flutter build apk --release --target-platform android-arm64
+flutter build apk --release
 ```
 
 </details>
