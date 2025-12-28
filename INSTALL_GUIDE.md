@@ -78,7 +78,52 @@ flutter doctor --android-licenses
 flutter doctor
 ```
 
-## 構建 APK
+## 構建 APK（完整步驟）
+
+### 步驟 7：修復 x86_64 CMake 問題
+
+Android SDK 中的 CMake 是 x86_64 版本，無法在 ARM64 Termux 運行。需要用 Termux 的 ARM64 cmake 替換：
+
+```bash
+# 安裝 Termux cmake 和 ninja
+pkg install cmake ninja
+
+# 替換 SDK CMake（根據你的 CMake 版本調整）
+CMAKE_VER=$(ls $ANDROID_HOME/cmake | head -1)
+rm -rf $ANDROID_HOME/cmake/$CMAKE_VER/bin
+mkdir -p $ANDROID_HOME/cmake/$CMAKE_VER/bin
+ln -s $PREFIX/bin/cmake $ANDROID_HOME/cmake/$CMAKE_VER/bin/cmake
+ln -s $PREFIX/bin/ninja $ANDROID_HOME/cmake/$CMAKE_VER/bin/ninja
+```
+
+### 步驟 8：修復 AAPT2 問題
+
+Gradle 下載的 AAPT2 是 x86_64 版本。使用 SDK build-tools 中的 ARM64 版本：
+
+```bash
+# 找到 Gradle 緩存的 aapt2
+AAPT2_CACHE=$(find ~/.gradle/caches -name "aapt2" -type f 2>/dev/null | head -1)
+
+if [ -n "$AAPT2_CACHE" ]; then
+    # 替換為 ARM64 版本
+    rm -f "$AAPT2_CACHE"
+    ln -s $ANDROID_HOME/build-tools/35.0.0/aapt2 "$AAPT2_CACHE"
+    echo "已替換 AAPT2 為 ARM64 版本"
+fi
+```
+
+> ⚠️ **注意**：第一次構建時 Gradle 會下載 AAPT2，構建失敗後再執行此步驟替換。
+
+### 步驟 9：複製 flutter_patched_sdk_product
+
+`flutter build apk --release` 需要 product 版本的 SDK：
+
+```bash
+FLUTTER_ROOT=$PREFIX/opt/flutter
+mkdir -p $FLUTTER_ROOT/bin/cache/artifacts/engine/common/flutter_patched_sdk_product
+cp -r $FLUTTER_ROOT/bin/cache/artifacts/engine/common/flutter_patched_sdk/* \
+      $FLUTTER_ROOT/bin/cache/artifacts/engine/common/flutter_patched_sdk_product/
+```
 
 ### 創建新專案
 
@@ -89,35 +134,27 @@ cd myapp
 
 ### 配置專案（必須）
 
-```bash
-# 自動配置
-curl -sL https://raw.githubusercontent.com/ImL1s/termux-flutter-wsl/master/setup_flutter_project.sh | bash
-```
-
-或手動配置 `android/gradle.properties`：
-```properties
-android.useAndroidX=true
-android.enableJetifier=true
-android.aapt2FromMavenOverride=/data/data/com.termux/files/usr/bin/aapt2
-org.gradle.jvmargs=-Xmx768m -XX:MaxMetaspaceSize=384m
-```
-
-並在 `android/app/build.gradle.kts` 中添加：
+在 `android/app/build.gradle.kts` 中指定 NDK 版本：
 ```kotlin
 android {
     ndkVersion = "27.1.12297006"
+    // ... 其他設定
 }
 ```
 
 ### 構建
 
 ```bash
-# Debug APK（較快）
-flutter build apk --debug
+# Release APK（只構建 ARM64，跳過不支援的架構）
+flutter build apk --release --target-platform android-arm64 --no-tree-shake-icons
 
-# Release APK
-flutter build apk --release
+# Debug APK
+flutter build apk --debug --target-platform android-arm64
 ```
+
+> ⚠️ **重要標記說明**：
+> - `--target-platform android-arm64`：只構建 ARM64，跳過 arm 和 x64（避免需要額外的 gen_snapshot）
+> - `--no-tree-shake-icons`：跳過圖標優化（避免需要 const_finder.dart.snapshot）
 
 ## 驗證安裝
 
@@ -136,10 +173,24 @@ $PREFIX/opt/flutter/bin/cache/artifacts/engine/android-arm64-release/linux-arm64
 pkg install x11-repo
 ```
 
-### 問題：AAPT2 錯誤
+### 問題：AAPT2 錯誤 (`EM_X86_64 instead of EM_AARCH64`)
+這表示 Gradle 使用了 x86_64 版本的 AAPT2。參見步驟 8 替換為 ARM64 版本：
 ```bash
-pkg install aapt2
+AAPT2_CACHE=$(find ~/.gradle/caches -name "aapt2" -type f 2>/dev/null | head -1)
+rm -f "$AAPT2_CACHE"
+ln -s $ANDROID_HOME/build-tools/35.0.0/aapt2 "$AAPT2_CACHE"
 ```
+
+### 問題：CMake 錯誤 (`unexpected e_type: 2`)
+Android SDK 的 CMake 是 x86_64 版本。參見步驟 7 替換為 Termux cmake。
+
+### 問題：gen_snapshot 版本不匹配
+錯誤訊息：`Wrong full snapshot version, expected 'X' found 'Y'`
+這表示 dart binary 與 snapshot 版本不匹配。確保使用我們提供的 deb 包。
+
+### 問題：flutter_patched_sdk_product 缺失
+錯誤訊息：`FileSystemException: Cannot open file`
+參見步驟 9 複製 flutter_patched_sdk 到 flutter_patched_sdk_product。
 
 ### 問題：NDK 找不到
 確保 NDK 安裝在正確位置：
@@ -152,4 +203,10 @@ ls $ANDROID_HOME/ndk/27.1.12297006/toolchains/llvm/prebuilt/linux-aarch64/bin/cl
 ```bash
 rm -rf ~/.gradle/caches
 rm -rf ~/.gradle/wrapper
+```
+
+### 問題：需要 arm/x64 的 gen_snapshot
+使用 `--target-platform android-arm64` 只構建 ARM64：
+```bash
+flutter build apk --release --target-platform android-arm64
 ```

@@ -156,6 +156,7 @@ class Build:
             '--runtime-mode', mode,
             '--no-build-glfw-shell',
             '--gn-args', 'symbol_level=0',
+            '--gn-args', 'use_default_linux_sysroot=false',
             '--gn-args', 'arm_use_neon=false',
             '--gn-args', 'arm_optionally_use_neon=true',
             '--gn-args', 'dart_include_wasm_opt=false',
@@ -164,7 +165,7 @@ class Build:
             '--gn-args', 'use_default_linux_sysroot=false',
             '--gn-args', 'dart_support_perfetto=false',
             '--gn-args', 'skia_use_perfetto=false',
-            '--gn-args', f'target_sysroot="{sysroot}"',
+            '--gn-args', f'custom_sysroot="{sysroot}"',
             '--gn-args', 'is_termux=true',
             '--gn-args', f'is_termux_host={utils.__TERMUX__}',
             # '--gn-args', f'termux_api_level={api}',
@@ -187,6 +188,175 @@ class Build:
             cmd.append(f'-j{jobs}')
         subprocess.run(cmd, check=True)
 
+    def build_dart(self, arch: str, mode: str, root: str = None, jobs: int = None):
+        """Build dart binary for Termux.
+
+        IMPORTANT: `ninja flutter` does NOT compile the dart binary!
+        This method compiles the dart binary separately and copies it to dart-sdk/bin/.
+
+        The dart binary is required for flutter build apk to work on Termux.
+        """
+        root = root or self.root
+        out_dir = utils.target_output(root, arch, mode)
+
+        # Build dart binary and dartaotruntime_product
+        cmd = [
+            'ninja', '-C', out_dir,
+            'exe.unstripped/dart',
+            'dartaotruntime_product',
+        ]
+        if jobs:
+            cmd.append(f'-j{jobs}')
+
+        logger.info(f'Building dart binary for {arch}...')
+        subprocess.run(cmd, check=True)
+
+        # Copy dart to dart-sdk/bin/
+        dart_src = os.path.join(out_dir, 'exe.unstripped', 'dart')
+        dart_dst = os.path.join(out_dir, 'dart-sdk', 'bin', 'dart')
+
+        if os.path.exists(dart_src):
+            os.makedirs(os.path.dirname(dart_dst), exist_ok=True)
+            shutil.copy(dart_src, dart_dst)
+            logger.info(f'dart binary copied to {dart_dst}')
+        else:
+            logger.warning(f'dart binary not found at {dart_src}')
+
+        # Copy dartaotruntime_product to dart-sdk/bin/dartaotruntime
+        aotruntime_src = os.path.join(out_dir, 'dartaotruntime_product')
+        aotruntime_dst = os.path.join(out_dir, 'dart-sdk', 'bin', 'dartaotruntime')
+
+        if os.path.exists(aotruntime_src):
+            shutil.copy(aotruntime_src, aotruntime_dst)
+            logger.info(f'dartaotruntime copied to {aotruntime_dst}')
+        else:
+            logger.warning(f'dartaotruntime_product not found at {aotruntime_src}')
+
+    def build_impellerc(self, arch: str, mode: str, root: str = None, jobs: int = None):
+        """Build impellerc shader compiler for Termux.
+
+        Required for flutter build apk --release to compile shaders.
+        """
+        root = root or self.root
+        out_dir = utils.target_output(root, arch, mode)
+
+        cmd = [
+            'ninja', '-C', out_dir,
+            'flutter/impeller/compiler:impellerc',
+        ]
+        if jobs:
+            cmd.append(f'-j{jobs}')
+
+        logger.info(f'Building impellerc for {arch}...')
+        subprocess.run(cmd, check=True)
+
+        # Verify impellerc was built
+        impellerc_path = os.path.join(out_dir, 'impellerc')
+        if os.path.exists(impellerc_path):
+            logger.info(f'impellerc built at {impellerc_path}')
+        else:
+            logger.warning(f'impellerc not found at {impellerc_path}')
+
+    def configure_android(
+        self,
+        arch: str = 'arm64',
+        mode: str = 'release',
+        root: str = None,
+        sysroot: str = None,
+        toolchain: str = None,
+    ):
+        """Configure GN for Android target with Termux cross-host.
+
+        This builds gen_snapshot that:
+        - Runs on ARM64 Termux (cross-compiled from x86-64)
+        - Produces Android ARM64 AOT code
+        """
+        root = root or self.root
+        sysroot = os.path.abspath(sysroot or self.sysroot.path)
+        toolchain = os.path.abspath(toolchain or self.toolchain)
+
+        # Output directory for Android build
+        out_dir = f'android_{mode}_{arch}'
+
+        cmd = [
+            'python3',
+            'engine/src/flutter/tools/gn',
+            '--android',
+            '--android-cpu', arch,
+            '--runtime-mode', mode,
+            '--no-goma',
+            '--no-backtrace',
+            '--clang',
+            '--lto',
+            '--no-enable-unittests',
+            '--no-build-embedder-examples',
+            '--no-prebuilt-dart-sdk',
+            # Note: no --target-toolchain for Android (uses default)
+            # Termux cross-host settings
+            '--gn-args', 'termux_cross_host=true',
+            '--gn-args', f'android_ndk_root="/opt/android-ndk-r27d"',
+            '--gn-args', f'termux_ndk_path="{toolchain}"',
+            '--gn-args', f'target_sysroot="{sysroot}"',
+            '--gn-args', 'symbol_level=0',
+            '--gn-args', 'use_default_linux_sysroot=false',
+        ]
+        logger.info(f'Configuring Android gen_snapshot build: {out_dir}')
+        subprocess.run(cmd, cwd=root, check=True)
+        return out_dir
+
+    def build_android_gen_snapshot(
+        self,
+        arch: str = 'arm64',
+        mode: str = 'release',
+        root: str = None,
+        jobs: int = None,
+    ):
+        """Build gen_snapshot for Android target.
+
+        This produces gen_snapshot that can be run on Termux
+        and generates Android ARM64 AOT code.
+        """
+        root = root or self.root
+        out_dir = f'android_{mode}_{arch}'
+        out_path = os.path.join(root, 'engine', 'src', 'out', out_dir)
+
+        cmd = [
+            'ninja', '-C', out_path,
+            'flutter/third_party/dart/runtime/bin:gen_snapshot',
+        ]
+        if jobs:
+            cmd.append(f'-j{jobs}')
+
+        logger.info(f'Building Android gen_snapshot: {out_dir}')
+        subprocess.run(cmd, check=True)
+
+        # Find and copy gen_snapshot to the location expected by package.yaml
+        # package.yaml expects: android_release_arm64/clang_arm64/gen_snapshot
+        possible_paths = [
+            os.path.join(out_path, 'exe.stripped', 'gen_snapshot'),
+            os.path.join(out_path, 'gen_snapshot'),
+            os.path.join(out_path, 'clang_x64', 'exe.stripped', 'gen_snapshot'),
+            os.path.join(out_path, 'clang_x64', 'gen_snapshot'),
+        ]
+
+        gen_snapshot_src = None
+        for path in possible_paths:
+            if os.path.exists(path):
+                gen_snapshot_src = path
+                break
+
+        if gen_snapshot_src:
+            # Copy to the location expected by package.yaml
+            target_dir = os.path.join(out_path, 'clang_arm64')
+            os.makedirs(target_dir, exist_ok=True)
+            target_path = os.path.join(target_dir, 'gen_snapshot')
+            shutil.copy(gen_snapshot_src, target_path)
+            logger.info(f'✓ gen_snapshot copied to {target_path}')
+            return target_path
+
+        logger.warning('gen_snapshot not found at expected paths')
+        return None
+
     def debuild(self, arch: str, output: str = None, root: str = None, **conf):
         conf = conf or self.package
         root = root or self.root
@@ -201,6 +371,44 @@ class Build:
             return self.release/name
         else:
             return self.release
+
+    def build_all(self, arch: str = 'arm64', jobs: int = None):
+        """One-command build for complete Flutter Termux package.
+
+        This builds everything needed for both:
+        - flutter run -d linux (Linux target)
+        - flutter build apk --release (Android target)
+
+        Usage:
+            python3 build.py build_all --arch=arm64
+        """
+        logger.info('=== Starting complete Flutter Termux build ===')
+
+        # Step 1: Build Linux debug (for flutter run -d linux)
+        logger.info('[1/6] Configuring Linux debug...')
+        self.configure(arch=arch, mode='debug')
+
+        logger.info('[2/6] Building Flutter engine + dart...')
+        self.build(arch=arch, mode='debug', jobs=jobs)
+        self.build_dart(arch=arch, mode='debug', jobs=jobs)
+
+        # Step 3: Build impellerc (for shader compilation)
+        logger.info('[3/6] Building impellerc...')
+        self.build_impellerc(arch=arch, mode='debug', jobs=jobs)
+
+        # Step 4: Build Android gen_snapshot (for flutter build apk)
+        logger.info('[4/6] Configuring Android gen_snapshot...')
+        self.configure_android(arch=arch, mode='release')
+
+        logger.info('[5/6] Building Android gen_snapshot...')
+        self.build_android_gen_snapshot(arch=arch, mode='release', jobs=jobs)
+
+        # Step 6: Package deb
+        logger.info('[6/6] Packaging deb...')
+        self.debuild(arch=arch, output=self.output(arch))
+
+        logger.info('=== Build complete! ===')
+        logger.info(f'Output: {self.output(arch)}')
 
     # TODO: check gclient and ninja existence
     def __call__(self):

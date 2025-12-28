@@ -110,7 +110,7 @@ curl -sL https://raw.githubusercontent.com/ImL1s/termux-flutter-wsl/master/insta
 
 ```bash
 # 1. 安裝基礎依賴
-pkg update && pkg install x11-repo wget openjdk-17
+pkg update && pkg install x11-repo wget openjdk-21
 
 # 2. 下載安裝包
 wget https://github.com/ImL1s/termux-flutter-wsl/releases/download/v3.35.0/flutter_3.35.0_aarch64.deb
@@ -167,7 +167,7 @@ flutter run -d linux
 ```bash
 # 更新套件並安裝 JDK
 pkg update
-pkg install openjdk-17 git wget
+pkg install openjdk-21 git wget
 ```
 
 #### 步驟 2：安裝 Android SDK
@@ -220,7 +220,7 @@ flutter doctor
 ```bash
 # 下載 ARM64 NDK（約 538MB）
 cd ~
-wget https://github.com/AntonioCiolworker/ArmDroid-NDK/releases/download/android-ndk/android-ndk-r27b-aarch64.zip
+wget https://github.com/lzhiyong/termux-ndk/releases/download/android-ndk/android-ndk-r27b-aarch64.zip
 
 # 解壓到 Android SDK 的 NDK 目錄
 mkdir -p $ANDROID_HOME/ndk
@@ -237,70 +237,131 @@ ls $ANDROID_HOME/ndk/27.1.12297006/toolchains/llvm/prebuilt/linux-aarch64/bin/cl
 
 > 💡 **來源**：[lzhiyong/termux-ndk](https://github.com/lzhiyong/termux-ndk) - 提供 ARM64 預編譯的 Android NDK。
 
-#### 步驟 6：配置 AAPT2
+#### 步驟 6：修復 x86_64 工具鏈（關鍵步驟）
 
-在 Termux 上構建 APK 需要使用原生 ARM64 的 AAPT2：
-
-```bash
-# 安裝 Termux 原生 aapt2
-pkg install aapt2
-
-# 在專案的 android/gradle.properties 中添加：
-echo "android.aapt2FromMavenOverride=$PREFIX/bin/aapt2" >> android/gradle.properties
-```
-
-#### 步驟 7：配置 Gradle（重要）
-
-**方法 A：使用一鍵配置腳本（推薦）**
+Android SDK 和 Gradle 下載的部分工具是 x86_64 版本，無法在 ARM64 Termux 上運行。需要替換為 ARM64 版本：
 
 ```bash
-# 在專案目錄中執行
-curl -sL https://raw.githubusercontent.com/ImL1s/termux-flutter-wsl/master/setup_flutter_project.sh | bash
+# 安裝 Termux 的 cmake 和 ninja
+pkg install cmake ninja
+
+# 修復 CMake（Android SDK 的 CMake 是 x86_64）
+# 首次構建時會下載 CMake，之後執行以下命令：
+rm -rf $ANDROID_HOME/cmake/*/bin
+mkdir -p $ANDROID_HOME/cmake/3.22.1/bin
+ln -s $PREFIX/bin/cmake $ANDROID_HOME/cmake/3.22.1/bin/cmake
+ln -s $PREFIX/bin/ninja $ANDROID_HOME/cmake/3.22.1/bin/ninja
 ```
 
-**方法 B：手動配置**
+#### 步驟 7：修復 AAPT2（關鍵步驟）
 
-在專案的 `android/gradle.properties` 中添加必要設定：
+Gradle 下載的 AAPT2 是 x86_64 版本，需要替換為 SDK build-tools 中的 ARM64 版本：
 
 ```bash
-cat >> android/gradle.properties << 'EOF'
-android.useAndroidX=true
-android.enableJetifier=true
-android.aapt2FromMavenOverride=/data/data/com.termux/files/usr/bin/aapt2
-org.gradle.jvmargs=-Xmx768m -XX:MaxMetaspaceSize=384m
-EOF
+# 首次構建後，找到 Gradle 緩存的 aapt2 位置並替換
+# 路徑格式：~/.gradle/caches/*/transforms/*/transformed/aapt2-*-linux/aapt2
+find ~/.gradle/caches -name "aapt2" -path "*/aapt2-*-linux/*" 2>/dev/null | while read f; do
+    rm -f "$f"
+    ln -s $ANDROID_HOME/build-tools/35.0.0/aapt2 "$f"
+    echo "Fixed: $f"
+done
 ```
 
-同時在 `android/app/build.gradle.kts` 中指定 NDK 版本：
+> ⚠️ **注意**：不要使用 `pkg install aapt2`，Termux 的 aapt2 版本 (2.19) 太舊，無法讀取新版 android.jar。
+> 必須使用 SDK build-tools 中的 ARM64 版本。
+
+#### 步驟 8：複製 flutter_patched_sdk_product
+
+`flutter build apk --release` 需要 product 版本的 SDK：
+
+```bash
+FLUTTER_ROOT=$PREFIX/opt/flutter
+mkdir -p $FLUTTER_ROOT/bin/cache/artifacts/engine/common/flutter_patched_sdk_product
+cp -r $FLUTTER_ROOT/bin/cache/artifacts/engine/common/flutter_patched_sdk/* \
+      $FLUTTER_ROOT/bin/cache/artifacts/engine/common/flutter_patched_sdk_product/
+```
+
+#### 步驟 9：配置 Flutter 專案
+
+在專案的 `android/local.properties` 中添加 NDK 路徑：
+
+```bash
+cd your_flutter_project
+echo "ndk.dir=$ANDROID_HOME/ndk/27.1.12297006" >> android/local.properties
+```
+
+在 `android/app/build.gradle.kts` 中指定 NDK 版本（找到 `ndkVersion` 行並修改）：
 
 ```kotlin
 android {
-    ndkVersion = "27.1.12297006"
+    ndkVersion = "27.1.12297006"  // 替換原來的 flutter.ndkVersion
     // ... 其他設定
 }
 ```
 
-#### 步驟 8：構建 APK
+#### 步驟 10：構建 APK
 
 ```bash
 # 創建專案
 flutter create myapp
 cd myapp
 
-# 構建 Debug APK
-flutter build apk --debug
-
-# 或構建 Release APK
-flutter build apk --release
+# 構建 Release APK（必須使用這些參數）
+flutter build apk --release --target-platform android-arm64 --no-tree-shake-icons
 ```
 
-> ✅ **已驗證**：使用上述配置，`flutter build apk` 已在 Termux 上成功運行！
+> ⚠️ **重要參數說明**：
+> - `--target-platform android-arm64`：只構建 ARM64 架構（我們只編譯了 arm64 的 gen_snapshot）
+> - `--no-tree-shake-icons`：跳過圖標優化（避免需要 const_finder.dart.snapshot）
+
+> ✅ **已驗證**：使用上述配置，`flutter build apk --release` 已在 Termux 上成功運行！
 >
 > 輸出示例：
 > ```
-> Running Gradle task 'assembleDebug'...                            194.6s
-> ✓ Built build/app/outputs/flutter-apk/app-debug.apk (70MB)
+> Running Gradle task 'assembleRelease'...                          230.4s
+> ✓ Built build/app/outputs/flutter-apk/app-release.apk (17.2MB)
 > ```
+
+<details>
+<summary><b>🔧 完整的首次構建流程</b></summary>
+
+由於部分工具需要在首次構建時下載，建議按以下順序操作：
+
+```bash
+# 1. 創建專案
+flutter create myapp
+cd myapp
+
+# 2. 配置 NDK 版本
+echo "ndk.dir=$ANDROID_HOME/ndk/27.1.12297006" >> android/local.properties
+sed -i 's/ndkVersion = flutter.ndkVersion/ndkVersion = "27.1.12297006"/g' android/app/build.gradle.kts
+
+# 3. 首次構建（會失敗，但會下載必要工具）
+flutter build apk --release --target-platform android-arm64 --no-tree-shake-icons 2>&1 || true
+
+# 4. 修復 CMake
+rm -rf $ANDROID_HOME/cmake/*/bin
+mkdir -p $ANDROID_HOME/cmake/3.22.1/bin
+ln -s $PREFIX/bin/cmake $ANDROID_HOME/cmake/3.22.1/bin/cmake
+ln -s $PREFIX/bin/ninja $ANDROID_HOME/cmake/3.22.1/bin/ninja
+
+# 5. 修復 AAPT2
+find ~/.gradle/caches -name "aapt2" -path "*/aapt2-*-linux/*" 2>/dev/null | while read f; do
+    rm -f "$f"
+    ln -s $ANDROID_HOME/build-tools/35.0.0/aapt2 "$f"
+done
+
+# 6. 複製 flutter_patched_sdk_product
+FLUTTER_ROOT=$PREFIX/opt/flutter
+mkdir -p $FLUTTER_ROOT/bin/cache/artifacts/engine/common/flutter_patched_sdk_product
+cp -r $FLUTTER_ROOT/bin/cache/artifacts/engine/common/flutter_patched_sdk/* \
+      $FLUTTER_ROOT/bin/cache/artifacts/engine/common/flutter_patched_sdk_product/
+
+# 7. 再次構建（應該成功）
+flutter build apk --release --target-platform android-arm64 --no-tree-shake-icons
+```
+
+</details>
 
 ### 部署到 Android 設備
 

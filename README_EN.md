@@ -110,7 +110,7 @@ curl -sL https://raw.githubusercontent.com/ImL1s/termux-flutter-wsl/master/insta
 
 ```bash
 # 1. Install dependencies
-pkg update && pkg install x11-repo wget openjdk-17
+pkg update && pkg install x11-repo wget openjdk-21
 
 # 2. Download package
 wget https://github.com/ImL1s/termux-flutter-wsl/releases/download/v3.35.0/flutter_3.35.0_aarch64.deb
@@ -167,7 +167,7 @@ To run `flutter build apk` in Termux, you need the full Android development envi
 ```bash
 # Update packages and install JDK
 pkg update
-pkg install openjdk-17 git wget
+pkg install openjdk-21 git wget
 ```
 
 #### Step 2: Install Android SDK
@@ -220,7 +220,7 @@ The official Android NDK only provides x86_64 Linux host binaries, which cannot 
 ```bash
 # Download ARM64 NDK (~538MB)
 cd ~
-wget https://github.com/AntonioCiolworker/ArmDroid-NDK/releases/download/android-ndk/android-ndk-r27b-aarch64.zip
+wget https://github.com/lzhiyong/termux-ndk/releases/download/android-ndk/android-ndk-r27b-aarch64.zip
 
 # Extract to Android SDK's NDK directory
 mkdir -p $ANDROID_HOME/ndk
@@ -237,19 +237,52 @@ ls $ANDROID_HOME/ndk/27.1.12297006/toolchains/llvm/prebuilt/linux-aarch64/bin/cl
 
 > 💡 **Source**: [lzhiyong/termux-ndk](https://github.com/lzhiyong/termux-ndk) - Provides prebuilt ARM64 Android NDK.
 
-#### Step 6: Configure AAPT2
+#### Step 6: Fix x86_64 CMake
 
-Building APK on Termux requires native ARM64 AAPT2:
+Android SDK's CMake is x86_64, cannot run on ARM64 Termux. Replace with Termux cmake:
 
 ```bash
-# Install Termux native aapt2
-pkg install aapt2
+# Install Termux cmake and ninja
+pkg install cmake ninja
 
-# Add to your project's android/gradle.properties:
-echo "android.aapt2FromMavenOverride=$PREFIX/bin/aapt2" >> android/gradle.properties
+# Replace SDK CMake (adjust version as needed)
+CMAKE_VER=$(ls $ANDROID_HOME/cmake | head -1)
+rm -rf $ANDROID_HOME/cmake/$CMAKE_VER/bin
+mkdir -p $ANDROID_HOME/cmake/$CMAKE_VER/bin
+ln -s $PREFIX/bin/cmake $ANDROID_HOME/cmake/$CMAKE_VER/bin/cmake
+ln -s $PREFIX/bin/ninja $ANDROID_HOME/cmake/$CMAKE_VER/bin/ninja
 ```
 
-#### Step 7: Configure Gradle (Important)
+#### Step 7: Fix AAPT2
+
+Gradle downloads x86_64 AAPT2. Use the ARM64 version from SDK build-tools:
+
+```bash
+# Find Gradle's cached aapt2
+AAPT2_CACHE=$(find ~/.gradle/caches -name "aapt2" -type f 2>/dev/null | head -1)
+
+if [ -n "$AAPT2_CACHE" ]; then
+    # Replace with ARM64 version
+    rm -f "$AAPT2_CACHE"
+    ln -s $ANDROID_HOME/build-tools/35.0.0/aapt2 "$AAPT2_CACHE"
+    echo "AAPT2 replaced with ARM64 version"
+fi
+```
+
+> **Note**: Gradle downloads AAPT2 on first build. Run this step after the first build fails.
+
+#### Step 8: Copy flutter_patched_sdk_product
+
+`flutter build apk --release` requires the product SDK:
+
+```bash
+FLUTTER_ROOT=$PREFIX/opt/flutter
+mkdir -p $FLUTTER_ROOT/bin/cache/artifacts/engine/common/flutter_patched_sdk_product
+cp -r $FLUTTER_ROOT/bin/cache/artifacts/engine/common/flutter_patched_sdk/* \
+      $FLUTTER_ROOT/bin/cache/artifacts/engine/common/flutter_patched_sdk_product/
+```
+
+#### Step 9: Configure Gradle (Important)
 
 **Option A: Use One-Click Configuration Script (Recommended)**
 
@@ -280,26 +313,33 @@ android {
 }
 ```
 
-#### Step 8: Build APK
+#### Step 10: Build APK
 
 ```bash
 # Create project
 flutter create myapp
 cd myapp
 
-# Build Debug APK
-flutter build apk --debug
+# Configure NDK version in android/app/build.gradle.kts
+# Add: ndkVersion = "27.1.12297006"
 
-# Or build Release APK
-flutter build apk --release
+# Build Release APK (ARM64 only, skip unsupported architectures)
+flutter build apk --release --target-platform android-arm64 --no-tree-shake-icons
+
+# Build Debug APK
+flutter build apk --debug --target-platform android-arm64
 ```
 
-> ✅ **Verified**: With the above configuration, `flutter build apk` runs successfully on Termux!
+> **Important flags explained**:
+> - `--target-platform android-arm64`: Build ARM64 only, skip arm and x64 (avoids needing extra gen_snapshot)
+> - `--no-tree-shake-icons`: Skip icon optimization (avoids needing const_finder.dart.snapshot)
+
+> ✅ **Verified**: With the above configuration, `flutter build apk --release` runs successfully on Termux!
 >
 > Example output:
 > ```
-> Running Gradle task 'assembleDebug'...                            194.6s
-> ✓ Built build/app/outputs/flutter-apk/app-debug.apk (70MB)
+> Running Gradle task 'assembleRelease'...                          312.5s
+> ✓ Built build/app/outputs/flutter-apk/app-release.apk (17.2MB)
 > ```
 
 ### Deploy to Android Device
