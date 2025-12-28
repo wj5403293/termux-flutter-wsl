@@ -52,7 +52,7 @@ pkg upgrade -y
 
 echo -e "${GREEN}[2/8]${NC} Installing dependencies..."
 pkg install -y x11-repo
-pkg install -y openjdk-17 git wget curl unzip aapt2
+pkg install -y openjdk-21 git wget curl unzip aapt2
 
 echo -e "${GREEN}[3/8]${NC} Downloading Flutter SDK..."
 cd ~
