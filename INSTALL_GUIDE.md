@@ -51,7 +51,7 @@ dpkg -i --force-architecture android-sdk_35.0.0_aarch64.deb
 
 ```bash
 cd ~
-wget https://github.com/AntonioCiolworker/ArmDroid-NDK/releases/download/android-ndk/android-ndk-r27b-aarch64.zip
+wget https://github.com/lzhiyong/termux-ndk/releases/download/android-ndk/android-ndk-r27b-aarch64.zip
 mkdir -p $PREFIX/opt/android-sdk/ndk
 unzip android-ndk-r27b-aarch64.zip -d $PREFIX/opt/android-sdk/ndk/
 mv $PREFIX/opt/android-sdk/ndk/android-ndk-r27b $PREFIX/opt/android-sdk/ndk/27.1.12297006

@@ -23,7 +23,7 @@ ANDROID_SDK_VERSION="35.0.0"
 ANDROID_SDK_URL="https://github.com/mumumusuc/termux-android-sdk/releases/download/${ANDROID_SDK_VERSION}/android-sdk_${ANDROID_SDK_VERSION}_aarch64.deb"
 # ARM64 NDK for APK building (from lzhiyong/termux-ndk)
 NDK_VERSION="27.1.12297006"
-NDK_URL="https://github.com/AntonioCiolworker/ArmDroid-NDK/releases/download/android-ndk/android-ndk-r27b-aarch64.zip"
+NDK_URL="https://github.com/lzhiyong/termux-ndk/releases/download/android-ndk/android-ndk-r27b-aarch64.zip"
 
 echo -e "${BLUE}"
 echo "╔═══════════════════════════════════════════════════════════╗"
