@@ -59,6 +59,7 @@ resource:
       - $any/gen_snapshot
       - $any/libpath_ops.so
       - $any/libtessellator.so
+      - $any/const_finder.dart.snapshot
     output:
       - $eng/linux-$arch
     define:
@@ -155,13 +156,37 @@ resource:
     mode: 0o644
 
   # Android gen_snapshot for building APKs on Termux
-  # This gen_snapshot runs on ARM64 Termux and produces Android ARM64 AOT code
-  android_gen_snapshot:
+  # These gen_snapshots run on ARM64 Termux and produce Android AOT code
+
+  # ARM64 target (most common)
+  android_gen_snapshot_arm64:
     source:
       - $android_out/clang_arm64/gen_snapshot
     output:
-      - $eng/android-$arch-release/linux-$arch
+      - $eng/android-arm64-release/linux-$arch
     define:
       eng: *eng
       android_out: f'{root}/engine/src/out/android_release_arm64'
+    mode: 0o755
+
+  # ARM (32-bit) target
+  android_gen_snapshot_arm:
+    source:
+      - $android_out/clang_arm64/gen_snapshot
+    output:
+      - $eng/android-arm-release/linux-$arch
+    define:
+      eng: *eng
+      android_out: f'{root}/engine/src/out/android_release_arm'
+    mode: 0o755
+
+  # x64 target (emulators, Chrome OS)
+  android_gen_snapshot_x64:
+    source:
+      - $android_out/clang_arm64/gen_snapshot
+    output:
+      - $eng/android-x64-release/linux-$arch
+    define:
+      eng: *eng
+      android_out: f'{root}/engine/src/out/android_release_x64'
     mode: 0o755

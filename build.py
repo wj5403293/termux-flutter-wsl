@@ -257,6 +257,34 @@ class Build:
         else:
             logger.warning(f'impellerc not found at {impellerc_path}')
 
+    def build_const_finder(self, arch: str, mode: str, root: str = None, jobs: int = None):
+        """Build const_finder.dart.snapshot for icon tree shaking.
+
+        Without this, users need --no-tree-shake-icons flag.
+        """
+        root = root or self.root
+        out_dir = utils.target_output(root, arch, mode)
+
+        cmd = [
+            'ninja', '-C', out_dir,
+            'flutter/tools/const_finder:const_finder',
+        ]
+        if jobs:
+            cmd.append(f'-j{jobs}')
+
+        logger.info(f'Building const_finder for {arch}...')
+        subprocess.run(cmd, check=True)
+
+        # Verify and copy to artifacts
+        snapshot_src = os.path.join(out_dir, 'gen', 'const_finder.dart.snapshot')
+        snapshot_dst = os.path.join(out_dir, 'const_finder.dart.snapshot')
+
+        if os.path.exists(snapshot_src):
+            shutil.copy(snapshot_src, snapshot_dst)
+            logger.info(f'const_finder.dart.snapshot built at {snapshot_dst}')
+        else:
+            logger.warning(f'const_finder.dart.snapshot not found at {snapshot_src}')
+
     def configure_android(
         self,
         arch: str = 'arm64',
@@ -377,7 +405,7 @@ class Build:
 
         This builds everything needed for both:
         - flutter run -d linux (Linux target)
-        - flutter build apk --release (Android target)
+        - flutter build apk --release (Android target, all architectures)
 
         Usage:
             python3 build.py build_all --arch=arm64
@@ -385,29 +413,32 @@ class Build:
         logger.info('=== Starting complete Flutter Termux build ===')
 
         # Step 1: Build Linux debug (for flutter run -d linux)
-        logger.info('[1/6] Configuring Linux debug...')
+        logger.info('[1/9] Configuring Linux debug...')
         self.configure(arch=arch, mode='debug')
 
-        logger.info('[2/6] Building Flutter engine + dart...')
+        logger.info('[2/9] Building Flutter engine + dart...')
         self.build(arch=arch, mode='debug', jobs=jobs)
         self.build_dart(arch=arch, mode='debug', jobs=jobs)
 
         # Step 3: Build impellerc (for shader compilation)
-        logger.info('[3/6] Building impellerc...')
+        logger.info('[3/9] Building impellerc...')
         self.build_impellerc(arch=arch, mode='debug', jobs=jobs)
 
-        # Step 4: Build Android gen_snapshot (for flutter build apk)
-        logger.info('[4/6] Configuring Android gen_snapshot...')
-        self.configure_android(arch=arch, mode='release')
+        # Step 4: Build const_finder (for icon tree shaking)
+        logger.info('[4/9] Building const_finder...')
+        self.build_const_finder(arch=arch, mode='debug', jobs=jobs)
 
-        logger.info('[5/6] Building Android gen_snapshot...')
-        self.build_android_gen_snapshot(arch=arch, mode='release', jobs=jobs)
+        # Step 5-7: Build Android gen_snapshot for all architectures
+        for android_arch in ['arm64', 'arm', 'x64']:
+            logger.info(f'[{5 + ["arm64", "arm", "x64"].index(android_arch)}/9] Building Android gen_snapshot ({android_arch})...')
+            self.configure_android(arch=android_arch, mode='release')
+            self.build_android_gen_snapshot(arch=android_arch, mode='release', jobs=jobs)
 
-        # Step 6: Package deb
-        logger.info('[6/6] Packaging deb...')
+        # Step 8: Package deb
+        logger.info('[8/9] Packaging deb...')
         self.debuild(arch=arch, output=self.output(arch))
 
-        logger.info('=== Build complete! ===')
+        logger.info('[9/9] Build complete!')
         logger.info(f'Output: {self.output(arch)}')
 
     # TODO: check gclient and ninja existence
