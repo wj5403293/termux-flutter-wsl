@@ -42,6 +42,20 @@ This project is based on [mumumusuc/termux-flutter](https://github.com/mumumusuc
 
 > ✅ **Verified**: Successfully ran Flutter app on Android 16 device!
 
+### 🏆 First: Native `flutter build apk` Support
+
+To our knowledge, this project is **the only solution** that can **natively** run `flutter build apk --release` on ARM64 Termux.
+
+| Project | `flutter build apk` | Method |
+|---------|---------------------|--------|
+| **This Project** | ✅ Supported | Cross-compiled gen_snapshot |
+| Flutter Official | ❌ Not supported | [Issue #177936](https://github.com/flutter/flutter/issues/177936): "arm64 hosts is currently not supported" |
+| [mumumusuc/termux-flutter](https://github.com/mumumusuc/termux-flutter) | ❌ Not supported | Only `flutter run -d linux` |
+| [Hax4us/flutter_in_termux](https://github.com/Hax4us/flutter_in_termux) | ⚠️ Requires proot | Via x86 emulation, slower performance |
+| [bdloser404/Fluttermux](https://github.com/bdloser404/Fluttermux) | ❌ Broken | Stopped working after Termux removed gpkg-dev |
+
+> 💡 If you find another project that natively supports this, please [open an Issue](https://github.com/ImL1s/termux-flutter-wsl/issues) to let us know!
+
 ### 📊 Feature Status
 
 | Feature | Status | Notes |
@@ -343,6 +357,27 @@ flutter build apk --debug --target-platform android-arm64
 > Therefore, you must use `--target-platform android-arm64` to skip other architectures.
 >
 > 💡 **Impact**: The output APK will only run on ARM64 devices. Most modern Android devices (2019+) are ARM64.
+
+<details>
+<summary><b>📝 Technical Limitation Analysis (Tested 2025-12-28)</b></summary>
+
+We attempted to compile gen_snapshot for android-arm and android-x64:
+
+| Target | Result | Error Reason |
+|--------|--------|--------------|
+| android-arm64 | ✅ Success | Host=ARM64, Target=ARM64, same architecture |
+| android-arm | ❌ Failed | BoringSSL has 32-bit shift overflow errors (`r0 << 63` on 32-bit type) |
+| android-x64 | ❌ Failed | ARM64 sysroot headers incompatible with x64 compilation |
+
+**Root cause**: Flutter Engine's GN build system assumes host and target are compatible architectures. When we need:
+- Host = ARM64 (where gen_snapshot runs)
+- Target = ARM32 or x64 (what code gen_snapshot produces)
+
+The build system cannot properly separate host toolchain from target compilation, causing dependency libraries to be compiled with wrong architecture settings.
+
+This is one of the reasons why Flutter officially doesn't support ARM64 hosts.
+
+</details>
 
 > ✅ **Verified**: With the above configuration, `flutter build apk --release` runs successfully on Termux!
 >

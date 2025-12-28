@@ -42,6 +42,20 @@
 
 > ✅ **已驗證**：本專案已在 Android 16 設備上成功運行 Flutter 應用！
 
+### 🏆 首創：原生支援 `flutter build apk`
+
+據我們所知，本專案是**目前唯一**能在 ARM64 Termux 上**原生**執行 `flutter build apk --release` 的解決方案。
+
+| 專案 | `flutter build apk` | 方式 |
+|------|---------------------|------|
+| **本專案** | ✅ 支援 | 交叉編譯 gen_snapshot |
+| Flutter 官方 | ❌ 不支援 | [Issue #177936](https://github.com/flutter/flutter/issues/177936): "arm64 hosts is currently not supported" |
+| [mumumusuc/termux-flutter](https://github.com/mumumusuc/termux-flutter) | ❌ 不支援 | 只有 `flutter run -d linux` |
+| [Hax4us/flutter_in_termux](https://github.com/Hax4us/flutter_in_termux) | ⚠️ 需要 proot | 透過 x86 模擬層，效能較差 |
+| [bdloser404/Fluttermux](https://github.com/bdloser404/Fluttermux) | ❌ 已失效 | Termux 移除 gpkg-dev 後無法使用 |
+
+> 💡 如果你發現其他能原生支援的專案，歡迎[開 Issue](https://github.com/ImL1s/termux-flutter-wsl/issues) 告訴我們！
+
 ### 📊 功能狀態
 
 | 功能 | 狀態 | 說明 |
@@ -323,6 +337,27 @@ flutter build apk --release --target-platform android-arm64
 > 因此必須使用 `--target-platform android-arm64` 來跳過其他架構。
 >
 > 💡 **影響範圍**：產出的 APK 只能在 ARM64 設備上運行。大多數現代 Android 設備（2019 年後）都是 ARM64。
+
+<details>
+<summary><b>📝 技術限制詳細分析（2025-12-28 測試）</b></summary>
+
+我們嘗試編譯了 android-arm 和 android-x64 的 gen_snapshot，結果如下：
+
+| 目標 | 結果 | 錯誤原因 |
+|------|------|----------|
+| android-arm64 | ✅ 成功 | Host=ARM64, Target=ARM64，相同架構 |
+| android-arm | ❌ 失敗 | BoringSSL 在 32-bit 有 shift 溢出錯誤（`r0 << 63` 在 32-bit 型別上） |
+| android-x64 | ❌ 失敗 | ARM64 sysroot 標頭檔與 x64 編譯不相容 |
+
+**根本原因**：Flutter Engine 的 GN 建構系統假設 host 和 target 是相容的架構。當需要：
+- Host = ARM64（gen_snapshot 執行的地方）
+- Target = ARM32 或 x64（gen_snapshot 產生程式碼的目標）
+
+建構系統無法正確分離 host toolchain 和 target compilation，導致依賴庫使用錯誤的架構設定編譯。
+
+這也是為什麼 Flutter 官方不支援 ARM64 host 的原因之一。
+
+</details>
 
 > ✅ **已驗證**：使用上述配置，`flutter build apk --release` 已在 Termux 上成功運行！
 >

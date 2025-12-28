@@ -408,9 +408,27 @@ class Build:
         - flutter build apk --release --target-platform android-arm64
 
         Note: Only android-arm64 gen_snapshot is built. Users must use
-        --target-platform android-arm64 when building APKs. This is due to
-        Dart VM cross-compilation limitations that prevent building
-        gen_snapshot for android-arm and android-x64 targets.
+        --target-platform android-arm64 when building APKs.
+
+        Technical limitation analysis (2025-12-28):
+        ============================================
+        We tested compiling gen_snapshot for android-arm and android-x64:
+
+        1. android-arm64: ✅ Works
+           - Host=ARM64, Target=ARM64, same architecture
+
+        2. android-arm (32-bit): ❌ Fails
+           - BoringSSL has shift overflow errors (e.g., `r0 << 63` on 32-bit type)
+           - The GN build system compiles host tool dependencies for target arch
+           - Would require extensive patches to BoringSSL and build system
+
+        3. android-x64: ❌ Fails
+           - ARM64 sysroot headers incompatible with x64 compilation
+           - Cross-architecture compilation fundamentally not supported
+
+        Root cause: Flutter Engine's GN build system assumes host and target
+        are compatible architectures. It doesn't properly separate host toolchain
+        (ARM64) from target compilation (ARM32/x64).
 
         Usage:
             python3 build.py build_all --arch=arm64
