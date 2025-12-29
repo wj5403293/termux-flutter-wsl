@@ -118,6 +118,12 @@ apt --fix-broken install -y
 # 載入環境
 source $PREFIX/etc/profile.d/flutter.sh 2>/dev/null || true
 
+# 執行 post_install.sh（配置 hot reload 和 APK 構建環境）
+if [ -f "$PREFIX/share/flutter/post_install.sh" ]; then
+    echo "執行 post_install.sh..."
+    bash $PREFIX/share/flutter/post_install.sh
+fi
+
 echo "  ✓ Flutter 已安裝"
 
 # ========================================
