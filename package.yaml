@@ -210,3 +210,34 @@ resource:
       eng: *eng
       android_out: f'{root}/engine/src/out/android_release_arm64'
     mode: 0o755
+
+  # Android gen_snapshot for profile mode (flutter build apk --profile)
+  android_gen_snapshot_arm64_profile:
+    source:
+      - $android_profile_out/gen_snapshot
+    output:
+      - $eng/android-arm64-profile/linux-$arch
+    define:
+      eng: *eng
+      android_profile_out: f'{root}/engine/src/out/android_profile_arm64'
+    mode: 0o755
+
+  # VM snapshots required for debug APK builds
+  # These are needed by Flutter tools running on ARM64 host
+  vm_snapshots:
+    source:
+      - $debug/gen/flutter/lib/snapshot/vm_isolate_snapshot.bin
+      - $debug/gen/flutter/lib/snapshot/isolate_snapshot.bin
+    output:
+      - $eng/linux-$arch
+    define:
+      eng: *eng
+      debug: output.debug
+    mode: 0o644
+
+  # Post-install script for APK build environment setup
+  # $root is flutter/, so need ../scripts to reach scripts/
+  post_install:
+    source: $root/../scripts/post_install.sh
+    output: $prefix/share/flutter/post_install.sh
+    mode: 0o755

@@ -44,6 +44,8 @@ class Build:
         arch = cfg['build'].get('arch')
         mode = cfg['build'].get('runtime')
         gclient = cfg['build'].get('gclient')
+        jobs = cfg['build'].get('jobs')
+        sync_cfg = cfg.get('sync', {})
         sysroot = cfg['sysroot']
         syspath = sysroot.pop('path')
         package = cfg['package'].get('conf')
@@ -69,6 +71,8 @@ class Build:
         self.gclient = path/gclient
         self.release = path/release
         self.toolchain = Path(ndk, f'toolchains/llvm/prebuilt/{self.host}')
+        self.jobs = jobs
+        self.sync_cfg = sync_cfg
 
         if not self.release.parent.is_dir():
             raise ValueError(f'bad release path: "{release}"')
@@ -168,20 +172,23 @@ class Build:
             '--gn-args', f'custom_sysroot="{sysroot}"',
             '--gn-args', 'is_termux=true',
             '--gn-args', f'is_termux_host={utils.__TERMUX__}',
+            '--gn-args', f'termux_ndk_path="{toolchain}"',
             # '--gn-args', f'termux_api_level={api}',
         ]
         subprocess.run(cmd, cwd=root, check=True)
 
     def build(self, arch: str, mode: str, root: str = None, jobs: int = None):
         root = root or self.root
+        jobs = jobs or self.jobs
         cmd = [
             'ninja', '-C', utils.target_output(root, arch, mode),
             'flutter',
+            # Build libflutter_linux_gtk.so for flutter build linux
+            'flutter/shell/platform/linux:flutter_gtk',
             # disable zip_archives
             # 'flutter/build/archives:artifacts',
             # 'flutter/build/archives:dart_sdk_archive',
             # 'flutter/build/archives:flutter_patched_sdk',
-            # 'flutter/shell/platform/linux:flutter_gtk',
             # 'flutter/tools/font_subset',
         ]
         if jobs:
@@ -197,6 +204,7 @@ class Build:
         The dart binary is required for flutter build apk to work on Termux.
         """
         root = root or self.root
+        jobs = jobs or self.jobs
         out_dir = utils.target_output(root, arch, mode)
 
         # Build dart binary and dartaotruntime_product
@@ -238,6 +246,7 @@ class Build:
         Required for flutter build apk --release to compile shaders.
         """
         root = root or self.root
+        jobs = jobs or self.jobs
         out_dir = utils.target_output(root, arch, mode)
 
         cmd = [
@@ -263,6 +272,7 @@ class Build:
         Without this, users need --no-tree-shake-icons flag.
         """
         root = root or self.root
+        jobs = jobs or self.jobs
         out_dir = utils.target_output(root, arch, mode)
 
         cmd = [
@@ -345,6 +355,7 @@ class Build:
         and generates Android ARM64 AOT code.
         """
         root = root or self.root
+        jobs = jobs or self.jobs
         out_dir = f'android_{mode}_{arch}'
         out_path = os.path.join(root, 'engine', 'src', 'out', out_dir)
 
@@ -385,8 +396,52 @@ class Build:
         logger.warning('gen_snapshot not found at expected paths')
         return None
 
+    def sync(self):
+        """Sync files from Windows to WSL before debuild.
+
+        This prevents the common issue of editing files on Windows
+        but building in WSL with stale copies.
+        """
+        import platform
+
+        if not self.sync_cfg:
+            logger.debug('No sync config, skipping')
+            return
+
+        windows_root = self.sync_cfg.get('windows_root')
+        wsl_root = self.sync_cfg.get('wsl_root')
+        paths = self.sync_cfg.get('paths', [])
+
+        if not windows_root or not wsl_root:
+            logger.warning('sync config incomplete, skipping')
+            return
+
+        # Convert Windows path to WSL mount path
+        wsl_mount = '/mnt/' + windows_root[0].lower() + windows_root[2:].replace('\\', '/')
+
+        # Detect if running in WSL (Linux) or Windows
+        is_wsl = platform.system() == 'Linux'
+
+        for p in paths:
+            src = f"{wsl_mount}/{p}"
+            dst = f"{wsl_root}/{p}"
+            cmd = f"cp -r {src} {dst}"
+            logger.info(f'Syncing: {p}')
+            if is_wsl:
+                # Running in WSL, execute directly
+                subprocess.run(['bash', '-c', cmd], check=False)
+            else:
+                # Running in Windows, use wsl command
+                subprocess.run(['wsl', '-e', 'bash', '-c', cmd], check=False)
+
+        logger.success('Sync completed')
+
     def debuild(self, arch: str, output: str = None, root: str = None, **conf):
+        # Sync files from Windows to WSL before building
+        self.sync()
+
         conf = conf or self.package
+        # root is Flutter SDK root (flutter/), set from [flutter].path in build.toml
         root = root or self.root
         output = output or self.output(arch)
 

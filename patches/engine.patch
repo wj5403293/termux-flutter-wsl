@@ -235,6 +235,7 @@ index 0000000..8208b13
 +    ldflags = [
 +      "-Bdynamic",
 +      "-Wl,-z,nocopyreloc",
++      "-Wl,--dynamic-linker=/system/bin/linker64",
 +    ]
 +  } else {
 +    configs = ["//build/config/gcc:executable_ldconfig"]

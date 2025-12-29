@@ -604,7 +604,243 @@ error: This system call is not available on Android
 
 ---
 
+## Termux APK 構建完整設置指南 (2025-12-29)
+
+安裝 deb 包後，需要以下額外設置才能使 `flutter build apk` 正常工作。
+
+### 1. 安裝 Android 平台 API 34
+
+Termux 的 aapt2 有 bug，無法處理 API 35/36 的 android.jar（[Issue #22667](https://github.com/termux/termux-packages/issues/22667)）。
+
+```bash
+# 下載並安裝 API 34
+cd /data/data/com.termux/files/usr/opt/android-sdk/platforms
+curl -L -o platform-34.zip 'https://dl.google.com/android/repository/platform-34-ext7_r02.zip'
+unzip -q platform-34.zip
+rm platform-34.zip
+```
+
+### 2. 配置 Flutter 僅構建 ARM64
+
+修改 FlutterPluginConstants.kt 以避免構建 x86_64（Termux 不支援）：
+
+```bash
+cat > /data/data/com.termux/files/usr/opt/flutter/packages/flutter_tools/gradle/src/main/kotlin/FlutterPluginConstants.kt << 'EOF'
+package com.flutter.gradle
+
+object FlutterPluginConstants {
+    private const val PLATFORM_ARM32 = "android-arm"
+    private const val PLATFORM_ARM64 = "android-arm64"
+    private const val PLATFORM_X86_64 = "android-x64"
+
+    private const val ARCH_ARM32 = "armeabi-v7a"
+    private const val ARCH_ARM64 = "arm64-v8a"
+    private const val ARCH_X86_64 = "x86_64"
+
+    const val INTERMEDIATES_DIR = "intermediates"
+    const val FLUTTER_STORAGE_BASE_URL = "FLUTTER_STORAGE_BASE_URL"
+    const val DEFAULT_MAVEN_HOST = "https://storage.googleapis.com"
+
+    @JvmStatic val PLATFORM_ARCH_MAP =
+        mapOf(
+            PLATFORM_ARM32 to ARCH_ARM32,
+            PLATFORM_ARM64 to ARCH_ARM64,
+            PLATFORM_X86_64 to ARCH_X86_64
+        )
+
+    @JvmStatic val ABI_VERSION =
+        mapOf(
+            ARCH_ARM32 to 1,
+            ARCH_ARM64 to 2,
+            ARCH_X86_64 to 4
+        )
+
+    // Modified for Termux: only arm64 supported
+    @JvmStatic val DEFAULT_PLATFORMS =
+        listOf(
+            PLATFORM_ARM64
+        )
+}
+EOF
+```
+
+### 3. 配置 NDK clang wrapper
+
+Termux 的 clang 需要正確的庫路徑，創建 wrapper script：
+
+```bash
+NDK=/data/data/com.termux/files/usr/opt/android-sdk/ndk/27.0.12077973
+mkdir -p $NDK/toolchains/llvm/prebuilt/bin
+
+# 備份原始 clang（如果存在）
+mv $NDK/toolchains/llvm/prebuilt/bin/clang $NDK/toolchains/llvm/prebuilt/bin/clang.orig 2>/dev/null
+
+# 創建 clang wrapper
+cat > $NDK/toolchains/llvm/prebuilt/bin/clang << 'EOF'
+#!/bin/sh
+NDK=/data/data/com.termux/files/usr/opt/android-sdk/ndk/27.0.12077973
+SYSROOT=$NDK/toolchains/llvm/prebuilt/linux-x86_64/sysroot
+CLANG_LIB=$NDK/toolchains/llvm/prebuilt/linux-x86_64/lib/clang/18/lib/linux
+
+ARCH=""
+for arg in "$@"; do
+    case "$arg" in
+        --target=aarch64*) ARCH="aarch64" ;;
+        --target=arm*) ARCH="arm" ;;
+    esac
+done
+
+if [ "$ARCH" = "aarch64" ]; then
+    LIB_PATH=$SYSROOT/usr/lib/aarch64-linux-android
+    CLANG_LIB_ARCH=$CLANG_LIB/aarch64
+elif [ "$ARCH" = "arm" ]; then
+    LIB_PATH=$SYSROOT/usr/lib/arm-linux-androideabi
+    CLANG_LIB_ARCH=$CLANG_LIB/arm
+else
+    exec /data/data/com.termux/files/usr/bin/clang "$@"
+fi
+
+exec /data/data/com.termux/files/usr/bin/clang -L$LIB_PATH -L$CLANG_LIB_ARCH "$@"
+EOF
+
+chmod +x $NDK/toolchains/llvm/prebuilt/bin/clang
+
+# 創建 clang++ wrapper
+cat > $NDK/toolchains/llvm/prebuilt/bin/clang++ << 'EOF'
+#!/bin/sh
+NDK=/data/data/com.termux/files/usr/opt/android-sdk/ndk/27.0.12077973
+SYSROOT=$NDK/toolchains/llvm/prebuilt/linux-x86_64/sysroot
+CLANG_LIB=$NDK/toolchains/llvm/prebuilt/linux-x86_64/lib/clang/18/lib/linux
+
+ARCH=""
+for arg in "$@"; do
+    case "$arg" in
+        --target=aarch64*) ARCH="aarch64" ;;
+        --target=arm*) ARCH="arm" ;;
+    esac
+done
+
+if [ "$ARCH" = "aarch64" ]; then
+    LIB_PATH=$SYSROOT/usr/lib/aarch64-linux-android
+    CLANG_LIB_ARCH=$CLANG_LIB/aarch64
+elif [ "$ARCH" = "arm" ]; then
+    LIB_PATH=$SYSROOT/usr/lib/arm-linux-androideabi
+    CLANG_LIB_ARCH=$CLANG_LIB/arm
+else
+    exec /data/data/com.termux/files/usr/bin/clang++ "$@"
+fi
+
+exec /data/data/com.termux/files/usr/bin/clang++ -L$LIB_PATH -L$CLANG_LIB_ARCH "$@"
+EOF
+
+chmod +x $NDK/toolchains/llvm/prebuilt/bin/clang++
+```
+
+### 4. 修補 NDK toolchain cmake
+
+移除 `-static-libstdc++`，否則會導致 `-lc++_shared` 連結錯誤：
+
+```bash
+NDK=/data/data/com.termux/files/usr/opt/android-sdk/ndk/27.0.12077973
+TOOLCHAIN=$NDK/build/cmake/android-legacy.toolchain.cmake
+
+# 備份
+cp $TOOLCHAIN ${TOOLCHAIN}.bak
+
+# 移除 -static-libstdc++
+sed -i 's/list(APPEND ANDROID_LINKER_FLAGS "-static-libstdc++")/# Disabled for Termux: list(APPEND ANDROID_LINKER_FLAGS "-static-libstdc++")/' $TOOLCHAIN
+```
+
+### 5. 創建 NDK sysroot 符號連結
+
+```bash
+NDK=/data/data/com.termux/files/usr/opt/android-sdk/ndk/27.0.12077973
+PREBUILT=$NDK/toolchains/llvm/prebuilt
+
+# sysroot 符號連結
+ln -sf linux-x86_64/sysroot $PREBUILT/sysroot 2>/dev/null
+
+# clang lib 版本符號連結
+ln -sf 18 $PREBUILT/linux-x86_64/lib/clang/21 2>/dev/null
+
+# 目標三元組符號連結
+SYSROOT=$PREBUILT/linux-x86_64/sysroot/usr/lib
+ln -sf aarch64-linux-android $SYSROOT/aarch64-none-linux-android 2>/dev/null
+ln -sf aarch64-linux-android/24 $SYSROOT/aarch64-none-linux-android24 2>/dev/null
+```
+
+### 6. 複製運行時庫到 sysroot
+
+```bash
+NDK=/data/data/com.termux/files/usr/opt/android-sdk/ndk/27.0.12077973
+CLANG_LIB=$NDK/toolchains/llvm/prebuilt/linux-x86_64/lib/clang/18/lib/linux
+SYSROOT=$NDK/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib
+
+# ARM64 庫
+for f in libunwind.a libatomic.a; do
+    ln -sf $CLANG_LIB/aarch64/$f $SYSROOT/aarch64-linux-android/$f 2>/dev/null
+    ln -sf $CLANG_LIB/aarch64/$f $SYSROOT/aarch64-linux-android/24/$f 2>/dev/null
+done
+
+# ARM32 庫
+for f in libunwind.a libatomic.a; do
+    ln -sf $CLANG_LIB/arm/$f $SYSROOT/arm-linux-androideabi/$f 2>/dev/null
+    ln -sf $CLANG_LIB/arm/$f $SYSROOT/arm-linux-androideabi/24/$f 2>/dev/null
+done
+```
+
+### 7. 配置 Flutter 專案 (每個專案都需要)
+
+在 `android/app/build.gradle.kts` 中：
+
+```kotlin
+android {
+    compileSdk = 34  // 使用 API 34，不是 flutter.compileSdkVersion
+
+    defaultConfig {
+        targetSdk = 34  // 使用 API 34
+        ndk {
+            abiFilters += listOf("arm64-v8a")  // 僅 ARM64
+        }
+    }
+}
+```
+
+在 `android/gradle.properties` 中：
+
+```properties
+org.gradle.jvmargs=-Xmx8G -XX:MaxMetaspaceSize=4G -XX:ReservedCodeCacheSize=512m -XX:+HeapDumpOnOutOfMemoryError
+android.useAndroidX=true
+android.enableJetifier=true
+android.aapt2FromMavenOverride=/data/data/com.termux/files/usr/bin/aapt2
+```
+
+**注意：** `android.aapt2FromMavenOverride` 是必須的！Gradle 下載的 aapt2 是 x86_64 版本，無法在 ARM64 Termux 運行。
+
+### 8. 完整驗證清單
+
+```bash
+# 所有模式都應該成功
+flutter build apk --release   # ✅ 151MB
+flutter build apk --debug     # ✅ 591MB
+flutter build apk --profile   # ✅ 165MB
+
+# 安裝 APK（需要從外部 ADB）
+# 在 PC 上執行：
+# scp -P 8022 <device_ip>:~/your_app/build/app/outputs/flutter-apk/app-release.apk .
+# adb install app-release.apk
+```
+
+---
+
 ## 更新日誌
+
+### 2025-12-29 v4
+- ✅ `flutter build apk --release` 完全正常
+- ✅ `flutter build apk --debug` 完全正常
+- ✅ `flutter build apk --profile` 完全正常
+- ✅ APK 安裝並運行正常
+- 📝 完整記錄 APK 構建的所有必要步驟
 
 ### 2025-12-29 v3
 - ✅ `flutter doctor` 完全正常

@@ -78,6 +78,9 @@ def reset(info):
 def add_bin(tar, out, src, mod=None):
     assert tar, out and isinstance(src, bytes)
 
+    # Create parent directories first
+    add_dir(tar, out.parent)
+
     info = tarfile.TarInfo(str(out))
     info.mode = mod or 0o644
     info.size = len(src)
@@ -87,6 +90,9 @@ def add_bin(tar, out, src, mod=None):
 
 def add_file(tar, out, src, mod=None):
     assert tar, out and src.exists()
+
+    # Create parent directories first
+    add_dir(tar, out.parent)
 
     info = tar.gettarinfo(src, out)
     info.mode = mod or info.mode

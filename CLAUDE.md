@@ -147,31 +147,42 @@ python3 build.py debuild --arch=arm64
 - Engine: 對應 Flutter 3.35.0 的 engine commit
 - 目標平台: aarch64 (ARM64)
 
-## 當前功能狀態
+## 當前功能狀態 (2025-12-29 全部驗證通過)
 
-| 功能 | 狀態 | 備註 |
+| 功能 | 狀態 | 需求 |
 |------|------|------|
-| `flutter doctor` | ✅ 已驗證 | |
-| `flutter create` | ✅ 已驗證 | |
-| `flutter build linux --debug` | ✅ 已驗證 | |
-| `flutter build linux --release` | ✅ 已驗證 | |
-| `flutter build linux --profile` | ✅ 已驗證 | |
-| `flutter build apk --release` | ✅ 已驗證 | 需要配置 ARM64 NDK |
-| `flutter build apk --debug` | ❌ 不支援 | 缺少 JIT artifacts |
-| `flutter build apk --profile` | ❌ 不支援 | 缺少 profile artifacts |
-| `flutter run -d linux` | 🔧 待測 | 需要 Termux:X11 |
+| `flutter doctor` | ✅ 已驗證 | 僅需 deb 安裝 |
+| `flutter create` | ✅ 已驗證 | 僅需 deb 安裝 |
+| `flutter build linux --debug` | ✅ 已驗證 | 需要: gtk3, x11-repo |
+| `flutter build linux --release` | ✅ 已驗證 | 需要: gtk3, x11-repo |
+| `flutter build linux --profile` | ✅ 已驗證 | 需要: gtk3, x11-repo |
+| `flutter build apk --release` | ✅ 已驗證 (151MB) | 需要: post_install.sh + 專案配置 compileSdk=34 |
+| `flutter build apk --debug` | ✅ 已驗證 (591MB) | 需要: post_install.sh + vm_isolate_snapshot.bin + 專案配置 |
+| `flutter build apk --profile` | ✅ 已驗證 (165MB) | 需要: post_install.sh + profile gen_snapshot + 專案配置 |
+| `flutter run -d linux --debug` | ✅ 已驗證 | 需要: termux-x11-nightly, DISPLAY=:0 |
+| `flutter run -d linux --release` | ✅ 已驗證 | 需要: termux-x11-nightly, DISPLAY=:0 |
+| APK 安裝運行 | ✅ 已驗證 | 需要: 從 PC 用 `adb install` (Termux 內 pm install 權限不足) |
 
-**APK 構建前置條件：**
-1. 使用 ARM64 NDK (`pkg install ndk-sysroot`)
-2. 在 `android/local.properties` 添加：
-   ```
-   ndk.dir=/data/data/com.termux/files/usr/opt/android-ndk
-   ```
-3. 替換 Gradle 緩存的 x86 AAPT2 為 ARM64 版本
+**APK 構建前置條件（安裝 deb 後執行 post_install.sh）：**
+1. 安裝 Android API 34（aapt2 bug workaround）
+2. 修改 FlutterPluginConstants.kt（僅構建 ARM64）
+3. 創建 NDK clang wrapper
+4. 修補 android-legacy.toolchain.cmake
+5. 創建 sysroot 符號連結
+6. 每個專案設置 compileSdk=34, targetSdk=34, ndk.abiFilters=arm64-v8a
 
-詳見 `BUILD_GUIDE.md` 和 `BUILD_PROCESS.md`。
+詳見 `BUILD_GUIDE.md` 的「Termux APK 構建完整設置指南」章節。
 
 ## 更新日誌
+
+### 2025-12-29 v4
+- ✅ **全部功能測試通過！**
+- ✅ flutter build apk --debug 正常 (需要 vm_isolate_snapshot.bin)
+- ✅ flutter build apk --profile 正常 (需要 profile gen_snapshot)
+- ✅ APK 安裝並運行正常
+- 📝 創建 post_install.sh 自動配置腳本
+- 📝 更新 package.yaml 包含所有必要 artifacts
+- 📝 完整記錄所有 APK 構建配置步驟
 
 ### 2025-12-29 v3
 - ✅ 完成所有 Linux build 模式測試 (debug/release/profile)
