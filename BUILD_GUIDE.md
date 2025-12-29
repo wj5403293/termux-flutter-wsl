@@ -276,16 +276,21 @@ python3 build.py debuild --arch=arm64
 標準 Android NDK 是 x86_64，無法在 Termux 運行。需要使用 lzhiyong 的 ARM64 NDK：
 
 ```bash
-# 下載 ARM64 NDK (已提供在專案中)
-# 或從 https://github.com/AntonioCiolworker/termux-ndk 下載
-pkg install android-ndk
+# 下載 ARM64 NDK（約 550MB）
+cd ~
+wget https://github.com/lzhiyong/termux-ndk/releases/download/android-ndk/android-ndk-r27b-aarch64.zip
+
+# 解壓到 Android SDK 目錄
+mkdir -p $ANDROID_HOME/ndk
+unzip android-ndk-r27b-aarch64.zip -d $ANDROID_HOME/ndk/
+mv $ANDROID_HOME/ndk/android-ndk-r27b $ANDROID_HOME/ndk/27.1.12297006
 ```
 
 #### 2. 配置項目使用 ARM64 NDK
 在 Flutter 專案的 `android/local.properties` 中添加：
 
 ```properties
-ndk.dir=/data/data/com.termux/files/usr/opt/android-ndk
+ndk.dir=/data/data/com.termux/files/usr/opt/android-sdk/ndk/27.1.12297006
 ```
 
 在 `android/app/build.gradle.kts` 中設置正確的 NDK 版本：
@@ -338,12 +343,12 @@ export ANDROID_SDK_ROOT=$ANDROID_HOME
 export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools
 
 cd your_flutter_project
-flutter build apk --release --target-platform android-arm64
+flutter build apk --release
 ```
 
 ### 注意事項
 
-- ~~`--target-platform android-arm64`~~：**已修復！** 現在 `flutter build apk --release` 可直接使用，無需指定平台
+- **無需 `--target-platform` 參數！** Flutter SDK 已修改為預設只編譯 ARM64
 - 首次構建需要下載 Gradle 依賴，約需 5-10 分鐘
 - APK 輸出在 `build/app/outputs/flutter-apk/app-release.apk`
 
@@ -510,7 +515,7 @@ export DISPLAY=:0
 flutter run -d linux
 ```
 
-### 7. gen_snapshot 版本不匹配
+### 8. gen_snapshot 版本不匹配
 
 **問題描述：**
 ```
@@ -530,7 +535,7 @@ python3 build.py build_all --arch=arm64
 python3 build.py build_dart --arch=arm64 --mode=debug
 ```
 
-### 8. ninja: error: 'xxx' does not exist
+### 9. ninja: error: 'xxx' does not exist
 
 **問題描述：**
 配置後立即構建出現文件不存在錯誤。
@@ -545,7 +550,7 @@ python3 build.py configure --arch=arm64 --mode=debug
 python3 build.py build --arch=arm64 --mode=debug
 ```
 
-### 9. TLS segment underaligned (Bionic linker 問題)
+### 10. TLS segment underaligned (Bionic linker 問題)
 
 **問題描述：**
 ```
@@ -593,12 +598,14 @@ ls -la flutter/engine/src/out/linux_debug_arm64/gen_snapshot
 ls -la flutter/engine/src/out/linux_debug_arm64/libflutter_linux_gtk.so
 ls -la flutter/engine/src/out/android_release_arm64/clang_arm64/gen_snapshot
 
-# 2. 部署到 Termux 後測試
-flutter doctor -v               # ✅ 已驗證正常
-flutter create test_app         # ✅ 已驗證正常
+# 2. 部署到 Termux 後測試（執行 post_install.sh 後）
+flutter doctor -v               # ✅ 已驗證
+flutter create test_app         # ✅ 已驗證
 cd test_app
-flutter build apk --release     # 🔧 開發中（可能有問題）
-flutter build linux --debug     # 🔧 開發中（可能有問題）
+flutter build apk --release     # ✅ 已驗證
+flutter build apk --debug       # ✅ 已驗證
+flutter build linux --debug     # ✅ 已驗證（需要 Termux:X11）
+flutter run                     # ✅ 已驗證（Hot Reload 支援）
 ```
 
 ## 當前版本狀態 (v3.35.0)
@@ -609,9 +616,11 @@ flutter build linux --debug     # 🔧 開發中（可能有問題）
 |------|------|------|
 | `flutter doctor` | ✅ 正常 | Dart, gen_snapshot 版本匹配 |
 | `flutter create` | ✅ 正常 | 可創建新專案 |
-| `flutter build apk --release` | ✅ 正常 | 需配置 Android SDK，僅支援 android-arm64 |
-| `flutter build linux --release` | ✅ 正常 | 需要 X11 環境來運行 |
+| `flutter build apk --release` | ✅ 正常 | 需執行 post_install.sh，僅支援 android-arm64 |
+| `flutter build apk --debug` | ✅ 正常 | 需執行 post_install.sh |
+| `flutter build linux` | ✅ 正常 | 需要 Termux:X11 來運行 |
 | `flutter run -d linux` | ✅ 正常 | 需要 Termux:X11 |
+| `flutter run` (Android) | ✅ 正常 | **Hot Reload 支援！** 需執行 post_install.sh |
 
 ### 已知限制
 
@@ -672,6 +681,11 @@ error: This system call is not available on Android
 ---
 
 ## Termux APK 構建完整設置指南 (2025-12-29)
+
+> **📌 重要：以下所有步驟已由 `post_install.sh` 自動完成！**
+>
+> 使用一鍵安裝腳本或執行 `bash $PREFIX/share/flutter/post_install.sh` 後，無需手動執行以下步驟。
+> 本節僅供開發者參考或手動排錯使用。
 
 安裝 deb 包後，需要以下額外設置才能使 `flutter build apk` 正常工作。
 
@@ -736,7 +750,7 @@ EOF
 Termux 的 clang 需要正確的庫路徑，創建 wrapper script：
 
 ```bash
-NDK=/data/data/com.termux/files/usr/opt/android-sdk/ndk/27.0.12077973
+NDK=/data/data/com.termux/files/usr/opt/android-sdk/ndk/27.1.12297006
 mkdir -p $NDK/toolchains/llvm/prebuilt/bin
 
 # 備份原始 clang（如果存在）
@@ -745,7 +759,7 @@ mv $NDK/toolchains/llvm/prebuilt/bin/clang $NDK/toolchains/llvm/prebuilt/bin/cla
 # 創建 clang wrapper
 cat > $NDK/toolchains/llvm/prebuilt/bin/clang << 'EOF'
 #!/bin/sh
-NDK=/data/data/com.termux/files/usr/opt/android-sdk/ndk/27.0.12077973
+NDK=/data/data/com.termux/files/usr/opt/android-sdk/ndk/27.1.12297006
 SYSROOT=$NDK/toolchains/llvm/prebuilt/linux-x86_64/sysroot
 CLANG_LIB=$NDK/toolchains/llvm/prebuilt/linux-x86_64/lib/clang/18/lib/linux
 
@@ -775,7 +789,7 @@ chmod +x $NDK/toolchains/llvm/prebuilt/bin/clang
 # 創建 clang++ wrapper
 cat > $NDK/toolchains/llvm/prebuilt/bin/clang++ << 'EOF'
 #!/bin/sh
-NDK=/data/data/com.termux/files/usr/opt/android-sdk/ndk/27.0.12077973
+NDK=/data/data/com.termux/files/usr/opt/android-sdk/ndk/27.1.12297006
 SYSROOT=$NDK/toolchains/llvm/prebuilt/linux-x86_64/sysroot
 CLANG_LIB=$NDK/toolchains/llvm/prebuilt/linux-x86_64/lib/clang/18/lib/linux
 
@@ -808,7 +822,7 @@ chmod +x $NDK/toolchains/llvm/prebuilt/bin/clang++
 移除 `-static-libstdc++`，否則會導致 `-lc++_shared` 連結錯誤：
 
 ```bash
-NDK=/data/data/com.termux/files/usr/opt/android-sdk/ndk/27.0.12077973
+NDK=/data/data/com.termux/files/usr/opt/android-sdk/ndk/27.1.12297006
 TOOLCHAIN=$NDK/build/cmake/android-legacy.toolchain.cmake
 
 # 備份
@@ -821,7 +835,7 @@ sed -i 's/list(APPEND ANDROID_LINKER_FLAGS "-static-libstdc++")/# Disabled for T
 ### 5. 創建 NDK sysroot 符號連結
 
 ```bash
-NDK=/data/data/com.termux/files/usr/opt/android-sdk/ndk/27.0.12077973
+NDK=/data/data/com.termux/files/usr/opt/android-sdk/ndk/27.1.12297006
 PREBUILT=$NDK/toolchains/llvm/prebuilt
 
 # sysroot 符號連結
@@ -839,7 +853,7 @@ ln -sf aarch64-linux-android/24 $SYSROOT/aarch64-none-linux-android24 2>/dev/nul
 ### 6. 複製運行時庫到 sysroot
 
 ```bash
-NDK=/data/data/com.termux/files/usr/opt/android-sdk/ndk/27.0.12077973
+NDK=/data/data/com.termux/files/usr/opt/android-sdk/ndk/27.1.12297006
 CLANG_LIB=$NDK/toolchains/llvm/prebuilt/linux-x86_64/lib/clang/18/lib/linux
 SYSROOT=$NDK/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib
 
@@ -901,6 +915,13 @@ flutter build apk --profile   # ✅ 165MB
 ---
 
 ## 更新日誌
+
+### 2025-12-29 v5
+- ✅ `flutter run` + Hot Reload 完整支援
+- ✅ `post_install.sh` 自動下載官方 Dart SDK snapshots（hot reload 必需）
+- ✅ `post_install.sh` 自動執行 termux-elf-cleaner（修復 linker warning）
+- 📝 修正文檔中的 NDK 版本和路徑
+- 📝 更新功能狀態表
 
 ### 2025-12-29 v4
 - ✅ `flutter build apk --release` 完全正常
