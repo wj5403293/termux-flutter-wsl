@@ -39,6 +39,53 @@
 
 ---
 
+## ❓ 為什麼需要這個專案？
+
+**Flutter「支援 arm64」≠「能在任何 arm64 上開發」**
+
+| Flutter 說的 arm64 支援 | 實際意義 |
+|------------------------|---------|
+| arm64 **Target** | ✅ 你的 App 能跑在 arm64 設備 |
+| arm64 **Host** | ⚠️ 只支援 macOS (Apple Silicon)、Linux (glibc) |
+| Android/Termux Host | ❌ **從未支援** |
+
+### 為什麼 Termux 不被支援？
+
+Flutter 假設的 Linux host 環境：
+- glibc（標準 C 庫）
+- 完整 POSIX
+- 標準 toolchain
+
+但 **Termux 是**：
+- **bionic libc**（Android 的 C 庫，不是 glibc）
+- Android sandbox + SELinux 限制
+- 不同的動態連結器 (`/system/bin/linker64`)
+
+對 Flutter 官方來說：**這不是他們支援的 OS。**
+
+### 我們做了什麼？
+
+```
+Flutter SDK 裡的 engine binaries：
+bin/cache/artifacts/engine/
+    ├── darwin-arm64/     ← macOS 用
+    ├── linux-arm64/      ← Linux (glibc) 用
+    └── android-arm64/    ← 這是 TARGET，不是 HOST！
+
+❌ 沒有 Termux/bionic host 版本
+```
+
+**我們從源碼交叉編譯了整個 Flutter Engine**，專門為 Termux (Android/bionic) 環境打造：
+
+- 修復 TLS 對齊問題（bionic linker 要求）
+- 修復動態連結器路徑
+- 編譯 host-side 工具（dart, gen_snapshot, impellerc）
+- 讓 Hot Reload、APK 構建在 Termux 上原生運行
+
+> **一句話：Flutter 官方支援 arm64 目標平台，但從不支援 Android 作為開發主機。我們補上了這個缺失。**
+
+---
+
 ## 📖 專案簡介
 
 本專案基於 [mumumusuc/termux-flutter](https://github.com/mumumusuc/termux-flutter)，實現了在 **WSL (Windows Subsystem for Linux)** 環境下為 Termux 交叉編譯 Flutter Engine 的完整解決方案。

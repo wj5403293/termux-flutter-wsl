@@ -39,6 +39,53 @@
 
 ---
 
+## ❓ Why Does This Project Exist?
+
+**Flutter "supports arm64" ≠ "you can develop on any arm64 device"**
+
+| What Flutter means by arm64 support | Reality |
+|-------------------------------------|---------|
+| arm64 **Target** | ✅ Your app can run on arm64 devices |
+| arm64 **Host** | ⚠️ Only macOS (Apple Silicon), Linux (glibc) |
+| Android/Termux as Host | ❌ **Never supported** |
+
+### Why isn't Termux supported?
+
+Flutter assumes a Linux host environment with:
+- glibc (standard C library)
+- Full POSIX compliance
+- Standard toolchain
+
+But **Termux is**:
+- **bionic libc** (Android's C library, not glibc)
+- Android sandbox + SELinux restrictions
+- Different dynamic linker (`/system/bin/linker64`)
+
+For Flutter officially: **This is not an OS they support.**
+
+### What did we do?
+
+```
+Flutter SDK engine binaries:
+bin/cache/artifacts/engine/
+    ├── darwin-arm64/     ← for macOS
+    ├── linux-arm64/      ← for Linux (glibc)
+    └── android-arm64/    ← This is TARGET, not HOST!
+
+❌ No Termux/bionic host version exists
+```
+
+**We cross-compiled the entire Flutter Engine from source**, specifically for Termux (Android/bionic):
+
+- Fixed TLS alignment issues (bionic linker requirement)
+- Fixed dynamic linker path
+- Compiled host-side tools (dart, gen_snapshot, impellerc)
+- Enabled Hot Reload and APK builds to run natively on Termux
+
+> **In one sentence: Flutter officially supports arm64 as a target platform, but never supported Android as a development host. We filled that gap.**
+
+---
+
 ## 📖 Introduction
 
 This project is based on [mumumusuc/termux-flutter](https://github.com/mumumusuc/termux-flutter) and provides a complete solution for cross-compiling the Flutter Engine for Termux on a **WSL (Windows Subsystem for Linux)** environment.
