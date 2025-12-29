@@ -29,6 +29,14 @@
   <em>🍴 Forked from <a href="https://github.com/mumumusuc/termux-flutter">mumumusuc/termux-flutter</a></em>
 </p>
 
+<p align="center">
+  <img src="assets/demo_hot_reload.jpg" alt="Flutter running on Termux with Hot Reload" width="600"/>
+</p>
+
+<p align="center">
+  <em>📱 在 Termux 中運行 Flutter App，支援 Hot Reload！</em>
+</p>
+
 ---
 
 ## 📖 專案簡介
