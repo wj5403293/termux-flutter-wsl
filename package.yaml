@@ -13,7 +13,7 @@ control:
   Architecture: $architecture
   Maintainer: mumumusuc <mumumusuc@gmail.com>
   Pre-Depends: x11-repo
-  Depends: git, which, gtk3, xorgproto, ninja, cmake, clang, pkg-config
+  Depends: git, which, gtk3, xorgproto, ninja, cmake, clang, pkg-config, openjdk-21
   Homepage: https://www.github.com/flutter/flutter
   Description: Flutter makes it easy and fast to build beautiful apps for mobile and beyond
 
@@ -48,7 +48,44 @@ resource:
     test:
       file: $remote/dart-sdk-linux-$arch.zip
       path: $distro/bin/cache
-  
+
+  # dart binary for running flutter commands
+  # Use debug mode dart as it has compatible snapshot flags
+  dart_bin:
+    source: $debug/dart
+    output: $out/dart-sdk/bin/dart
+    define:
+      debug: output.debug
+      out: *cache
+    mode: 0o755
+
+  # dart snapshots required for flutter commands
+  dart_snapshots:
+    source: $debug/dart-sdk/bin/snapshots
+    output: $out/dart-sdk/bin/snapshots
+    define:
+      debug: output.debug
+      out: *cache
+
+  # dartaotruntime is required for flutter build apk/linux
+  dartaotruntime:
+    source: $any/dartaotruntime_product
+    output: $out/dart-sdk/bin/dartaotruntime
+    define:
+      any: *any
+      out: *cache
+    mode: 0o755
+
+  # frontend_server_aot snapshot for AOT compilation
+  # Use product mode snapshot to work with dartaotruntime_product
+  frontend_server_aot:
+    source: $any/frontend_server_aot_product.dart.snapshot
+    output: $out/dart-sdk/bin/snapshots/frontend_server_aot.dart.snapshot
+    define:
+      any: *any
+      out: *cache
+    mode: 0o644
+
   artifacts:
     source:
       - $root/engine/src/flutter/impeller/compiler/shader_lib

@@ -1,10 +1,15 @@
 #!/data/data/com.termux/files/usr/bin/bash
 #
-# Termux Flutter + Android SDK 一鍵安裝腳本
+# Termux Flutter 一鍵安裝腳本
 # One-click installer for Flutter development on Termux
-# Includes ARM64 NDK for APK building support
 #
 # Usage: curl -sL https://raw.githubusercontent.com/ImL1s/termux-flutter-wsl/master/install_termux_flutter.sh | bash
+#
+# 當前狀態 (v3.35.0):
+#   - flutter doctor: ✅ 已驗證
+#   - flutter create: ✅ 已驗證
+#   - flutter build apk: 🔧 開發中
+#   - flutter build linux: 🔧 開發中
 #
 
 set -e
@@ -19,16 +24,11 @@ NC='\033[0m' # No Color
 # 版本配置
 FLUTTER_VERSION="3.35.0"
 FLUTTER_DEB_URL="https://github.com/ImL1s/termux-flutter-wsl/releases/download/v${FLUTTER_VERSION}/flutter_${FLUTTER_VERSION}_aarch64.deb"
-ANDROID_SDK_VERSION="35.0.0"
-ANDROID_SDK_URL="https://github.com/mumumusuc/termux-android-sdk/releases/download/${ANDROID_SDK_VERSION}/android-sdk_${ANDROID_SDK_VERSION}_aarch64.deb"
-# ARM64 NDK for APK building (from lzhiyong/termux-ndk)
-NDK_VERSION="27.1.12297006"
-NDK_URL="https://github.com/lzhiyong/termux-ndk/releases/download/android-ndk/android-ndk-r27b-aarch64.zip"
 
 echo -e "${BLUE}"
 echo "╔═══════════════════════════════════════════════════════════╗"
-echo "║     Termux Flutter + Android SDK Installer                ║"
-echo "║     Flutter ${FLUTTER_VERSION} | Android SDK ${ANDROID_SDK_VERSION} | NDK r27b       ║"
+echo "║     Termux Flutter Installer                              ║"
+echo "║     Flutter ${FLUTTER_VERSION}                                         ║"
 echo "╚═══════════════════════════════════════════════════════════╝"
 echo -e "${NC}"
 
@@ -46,15 +46,17 @@ if [ ! -d "/data/data/com.termux" ]; then
     exit 1
 fi
 
-echo -e "${GREEN}[1/8]${NC} Updating packages..."
+TOTAL_STEPS=5
+
+echo -e "${GREEN}[1/${TOTAL_STEPS}]${NC} Updating packages..."
 pkg update -y
 pkg upgrade -y
 
-echo -e "${GREEN}[2/8]${NC} Installing dependencies..."
+echo -e "${GREEN}[2/${TOTAL_STEPS}]${NC} Installing dependencies..."
 pkg install -y x11-repo
-pkg install -y openjdk-21 git wget curl unzip aapt2
+pkg install -y openjdk-21 git wget curl unzip
 
-echo -e "${GREEN}[3/8]${NC} Downloading Flutter SDK..."
+echo -e "${GREEN}[3/${TOTAL_STEPS}]${NC} Downloading Flutter SDK..."
 cd ~
 if [ -f "flutter_${FLUTTER_VERSION}_aarch64.deb" ]; then
     echo "Flutter deb already exists, skipping download."
@@ -62,114 +64,56 @@ else
     wget -q --show-progress "$FLUTTER_DEB_URL" -O "flutter_${FLUTTER_VERSION}_aarch64.deb"
 fi
 
-echo -e "${GREEN}[4/8]${NC} Downloading Android SDK..."
-if [ -f "android-sdk_${ANDROID_SDK_VERSION}_aarch64.deb" ]; then
-    echo "Android SDK deb already exists, skipping download."
-else
-    wget -q --show-progress "$ANDROID_SDK_URL" -O "android-sdk_${ANDROID_SDK_VERSION}_aarch64.deb"
-fi
-
-echo -e "${GREEN}[5/8]${NC} Downloading ARM64 NDK (for APK building)..."
-NDK_ZIP="android-ndk-r27b-aarch64.zip"
-if [ -f "$NDK_ZIP" ]; then
-    echo "NDK zip already exists, skipping download."
-else
-    echo "This may take a while (~538MB)..."
-    wget -q --show-progress "$NDK_URL" -O "$NDK_ZIP"
-fi
-
-echo -e "${GREEN}[6/8]${NC} Installing packages..."
+echo -e "${GREEN}[4/${TOTAL_STEPS}]${NC} Installing Flutter..."
 dpkg -i "flutter_${FLUTTER_VERSION}_aarch64.deb" || true
-dpkg -i --force-architecture "android-sdk_${ANDROID_SDK_VERSION}_aarch64.deb" || true
 apt --fix-broken install -y
 
-echo -e "${GREEN}[7/8]${NC} Installing ARM64 NDK..."
-mkdir -p $PREFIX/opt/android-sdk/ndk
-if [ -d "$PREFIX/opt/android-sdk/ndk/${NDK_VERSION}" ]; then
-    echo "NDK already installed, skipping."
-else
-    unzip -q "$NDK_ZIP" -d $PREFIX/opt/android-sdk/ndk/
-    mv $PREFIX/opt/android-sdk/ndk/android-ndk-r27b $PREFIX/opt/android-sdk/ndk/${NDK_VERSION}
-    echo "NDK installed to $PREFIX/opt/android-sdk/ndk/${NDK_VERSION}"
+echo -e "${GREEN}[5/${TOTAL_STEPS}]${NC} Configuring environment..."
+
+# 載入環境變數
+source $PREFIX/etc/profile.d/flutter.sh 2>/dev/null || true
+
+# 加入 .bashrc（如果還沒加入）
+if ! grep -q "flutter.sh" ~/.bashrc 2>/dev/null; then
+    echo 'source $PREFIX/etc/profile.d/flutter.sh' >> ~/.bashrc
+    echo "Added flutter to ~/.bashrc"
 fi
 
-echo -e "${GREEN}[8/8]${NC} Configuring environment..."
-
-# 設定環境變數 (不設置 JAVA_HOME，讓 Gradle 自動找)
-ENV_CONFIG='
-# Flutter & Android SDK Configuration
-export ANDROID_HOME=$PREFIX/opt/android-sdk
-export PATH=$PATH:$ANDROID_HOME/platform-tools:$ANDROID_HOME/cmdline-tools/latest/bin
-'
-
-# 加入 .bashrc
-if ! grep -q "ANDROID_HOME" ~/.bashrc 2>/dev/null; then
-    echo "$ENV_CONFIG" >> ~/.bashrc
-    echo "Added environment variables to ~/.bashrc"
-fi
-
-# 加入 .zshrc (如果存在)
+# 加入 .zshrc（如果存在且還沒加入）
 if [ -f ~/.zshrc ]; then
-    if ! grep -q "ANDROID_HOME" ~/.zshrc; then
-        echo "$ENV_CONFIG" >> ~/.zshrc
-        echo "Added environment variables to ~/.zshrc"
+    if ! grep -q "flutter.sh" ~/.zshrc; then
+        echo 'source $PREFIX/etc/profile.d/flutter.sh' >> ~/.zshrc
+        echo "Added flutter to ~/.zshrc"
     fi
 fi
 
-# 立即載入環境變數
-export ANDROID_HOME=$PREFIX/opt/android-sdk
-export PATH=$PATH:$ANDROID_HOME/platform-tools:$ANDROID_HOME/cmdline-tools/latest/bin
-# 確保不設置 JAVA_HOME
-unset JAVA_HOME
-
-# 配置 Flutter
-echo -e "${YELLOW}Configuring Flutter...${NC}"
-flutter config --android-sdk $ANDROID_HOME 2>/dev/null || true
-
-# 清理下載檔案（保留 NDK zip 因為太大了）
+echo ""
 echo "Cleaning up..."
 rm -f "flutter_${FLUTTER_VERSION}_aarch64.deb"
-rm -f "android-sdk_${ANDROID_SDK_VERSION}_aarch64.deb"
-echo -e "${YELLOW}Note: NDK zip kept at ~/$NDK_ZIP (delete manually if needed)${NC}"
 
 echo ""
 echo -e "${GREEN}╔═══════════════════════════════════════════════════════════╗${NC}"
 echo -e "${GREEN}║     Installation Complete!                                ║${NC}"
 echo -e "${GREEN}╚═══════════════════════════════════════════════════════════╝${NC}"
 echo ""
-echo -e "${YELLOW}Next steps:${NC}"
+echo -e "${YELLOW}Verify installation:${NC}"
 echo ""
 echo "1. Restart Termux or run:"
 echo -e "   ${BLUE}source ~/.bashrc${NC}"
 echo ""
-echo "2. Accept Android licenses:"
-echo -e "   ${BLUE}flutter doctor --android-licenses${NC}"
-echo ""
-echo "3. Check installation:"
+echo "2. Check Flutter:"
 echo -e "   ${BLUE}flutter doctor${NC}"
 echo ""
-echo "4. Create and run your first app:"
-echo -e "   ${BLUE}flutter create myapp && cd myapp${NC}"
-echo -e "   ${BLUE}flutter run -d linux${NC}  (requires Termux:X11)"
+echo "3. Create your first app:"
+echo -e "   ${BLUE}flutter create myapp${NC}"
 echo ""
-echo -e "${GREEN}✅ APK Building is now supported!${NC}"
+echo -e "${GREEN}✅ Verified working:${NC}"
+echo "   - flutter doctor"
+echo "   - flutter create"
 echo ""
-echo "To build APK, add these to your project's android/gradle.properties:"
-echo -e "   ${BLUE}android.useAndroidX=true${NC}"
-echo -e "   ${BLUE}android.enableJetifier=true${NC}"
-echo -e "   ${BLUE}android.aapt2FromMavenOverride=\$PREFIX/bin/aapt2${NC}"
-echo ""
-echo "And set NDK version in android/app/build.gradle.kts:"
-echo -e "   ${BLUE}ndkVersion = \"${NDK_VERSION}\"${NC}"
-echo ""
-echo "Then run:"
-echo -e "   ${BLUE}flutter build apk --debug${NC}"
-echo ""
-echo -e "${YELLOW}To connect ADB (same device):${NC}"
-echo "   1. Enable Developer Options > Wireless Debugging"
-echo "   2. Tap 'Pair device with pairing code'"
-echo -e "   3. Run: ${BLUE}adb pair 127.0.0.1:<port>${NC}"
-echo -e "   4. Run: ${BLUE}adb connect 127.0.0.1:<port>${NC}"
+echo -e "${YELLOW}📱 For Android APK building:${NC}"
+echo "   See: https://github.com/ImL1s/termux-flutter-wsl#構建-android-apk"
+echo "   (Requires additional setup: Android SDK, NDK, etc.)"
 echo ""
 echo -e "Documentation: ${BLUE}https://github.com/ImL1s/termux-flutter-wsl${NC}"
 echo ""

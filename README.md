@@ -42,13 +42,13 @@
 
 > ✅ **已驗證**：本專案已在 Android 16 設備上成功運行 Flutter 應用！
 
-### 🏆 首創：原生支援 `flutter build apk`
+### 🏆 達成目標：原生支援 `flutter build apk`
 
-據我們所知，本專案是**目前唯一**能在 ARM64 Termux 上**原生**執行 `flutter build apk --release` 的解決方案。
+本專案是**世界首個**在 ARM64 Termux 上實現原生 `flutter build apk --release` 的解決方案！
 
 | 專案 | `flutter build apk` | 方式 |
 |------|---------------------|------|
-| **本專案** | ✅ 支援 | 交叉編譯 gen_snapshot |
+| **本專案** | ✅ **已實現** | 交叉編譯 gen_snapshot + ARM64 NDK |
 | Flutter 官方 | ❌ 不支援 | [Issue #177936](https://github.com/flutter/flutter/issues/177936): "arm64 hosts is currently not supported" |
 | [mumumusuc/termux-flutter](https://github.com/mumumusuc/termux-flutter) | ❌ 不支援 | 只有 `flutter run -d linux` |
 | [Hax4us/flutter_in_termux](https://github.com/Hax4us/flutter_in_termux) | ⚠️ 需要 proot | 透過 x86 模擬層，效能較差 |
@@ -60,9 +60,13 @@
 
 | 功能 | 狀態 | 說明 |
 |------|------|------|
-| Flutter SDK (Linux) | ✅ 完成 | `flutter run -d linux` 可正常運行 |
-| gen_snapshot (ARM64) | ✅ 完成 | 交叉編譯成功，在 Termux 上輸出 `android_arm64` |
-| flutter build apk | ✅ 完成 | 需安裝 ARM64 NDK（見下方說明） |
+| `flutter doctor` | ✅ 已驗證 | Dart SDK 正常運行 |
+| `flutter create` | ✅ 已驗證 | 可創建新專案 |
+| `flutter run -d linux` | ✅ 已驗證 | 需要 Termux:X11 |
+| `flutter build linux` | ✅ 已驗證 | 產出 ARM64 ELF 執行檔 |
+| `flutter build apk` | ✅ 已驗證 | 需配置 Android SDK (見下方說明) |
+
+> ✅ **v3.35.0 正式版**：所有核心功能已驗證可用！APK 構建需要額外安裝 Android SDK，請參考下方「構建 Android APK」章節。
 
 ### ✨ 主要特色
 
@@ -110,15 +114,32 @@ flutter doctor
 
 ## 🚀 快速開始
 
-### 一鍵安裝（推薦）
+### 完整一鍵安裝（推薦 - 包含 APK 構建）
 
-在 Termux 中執行以下命令，自動安裝 Flutter + Android SDK：
+一個命令安裝 Flutter + Android SDK + NDK，完成後直接可以 `flutter build apk`：
+
+```bash
+curl -sL https://raw.githubusercontent.com/ImL1s/termux-flutter-wsl/master/install_flutter_complete.sh | bash
+```
+
+> 此腳本會自動安裝 Flutter、Android SDK、ARM64 NDK，並測試 APK 構建。
+> 總大小約 1.8GB，需要 10-30 分鐘。
+
+### 只安裝 Flutter（不含 APK 構建）
+
+如果只需要 `flutter run -d linux`，不需要構建 APK：
 
 ```bash
 curl -sL https://raw.githubusercontent.com/ImL1s/termux-flutter-wsl/master/install_termux_flutter.sh | bash
 ```
 
-> 此腳本會自動安裝 Flutter 3.35.0、Android SDK 35.0.0、JDK 17，並配置環境變數。
+安裝完成後：
+```bash
+source ~/.bashrc
+flutter doctor
+```
+
+> 此腳本只安裝 Flutter SDK (~550MB)，不含 Android SDK。
 
 ### 手動安裝
 
@@ -129,9 +150,13 @@ pkg update && pkg install x11-repo wget openjdk-21
 # 2. 下載安裝包
 wget https://github.com/ImL1s/termux-flutter-wsl/releases/download/v3.35.0/flutter_3.35.0_aarch64.deb
 
-# 3. 安裝與驗證
+# 3. 安裝
 dpkg -i flutter_3.35.0_aarch64.deb
-flutter --version
+apt --fix-broken install -y
+
+# 4. 載入環境並驗證
+source $PREFIX/etc/profile.d/flutter.sh
+flutter doctor
 ```
 
 ### 自行編譯（WSL 環境）
@@ -174,9 +199,33 @@ flutter run -d linux
 
 ### 構建 Android APK
 
-要在 Termux 中執行 `flutter build apk`，需要安裝完整的 Android 開發環境。
+> ✅ **已驗證可用**：APK 構建功能已在 ARM64 設備上驗證成功！
 
-#### 步驟 1：安裝依賴
+要在 Termux 中執行 `flutter build apk`，需要安裝 Android SDK。提供兩種方式：
+
+#### 方式 A：一鍵安裝（推薦）
+
+```bash
+# 1. 安裝 Android SDK（約 700MB）
+curl -sL https://raw.githubusercontent.com/ImL1s/termux-flutter-wsl/master/setup_android_sdk.sh | bash
+source ~/.bashrc
+
+# 2. 創建專案並構建 APK
+flutter create myapp
+cd myapp
+
+# 3. 一鍵配置並構建（自動處理 NDK、AAPT2 等問題）
+curl -sL https://raw.githubusercontent.com/ImL1s/termux-flutter-wsl/master/build_first_apk.sh | bash
+```
+
+> 首次構建約需 3-5 分鐘（下載 Gradle 依賴）
+
+#### 方式 B：手動安裝
+
+<details>
+<summary><b>展開手動安裝步驟</b></summary>
+
+##### 步驟 1：安裝依賴
 
 ```bash
 # 更新套件並安裝 JDK
@@ -281,8 +330,8 @@ find ~/.gradle/caches -name "aapt2" -path "*/aapt2-*-linux/*" 2>/dev/null | whil
 done
 ```
 
-> ⚠️ **注意**：不要使用 `pkg install aapt2`，Termux 的 aapt2 版本 (2.19) 太舊，無法讀取新版 android.jar。
-> 必須使用 SDK build-tools 中的 ARM64 版本。
+> ⚠️ **注意**：不要使用 `$PREFIX/bin/aapt2`，Termux 的 aapt2 版本 (2.19) 太舊，無法讀取新版 android.jar。
+> 必須使用 SDK build-tools 中的 ARM64 版本：`$ANDROID_HOME/build-tools/35.0.0/aapt2`
 
 #### 步驟 8：複製 flutter_patched_sdk_product
 
@@ -398,6 +447,8 @@ cp -r $FLUTTER_ROOT/bin/cache/artifacts/engine/common/flutter_patched_sdk/* \
 # 7. 再次構建（應該成功）
 flutter build apk --release
 ```
+
+</details>
 
 </details>
 

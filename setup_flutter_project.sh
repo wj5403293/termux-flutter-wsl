@@ -37,7 +37,20 @@ if [ ! -d "android" ]; then
     exit 1
 fi
 
-echo -e "${GREEN}[1/3]${NC} Configuring gradle.properties..."
+echo -e "${GREEN}[1/4]${NC} Configuring local.properties..."
+
+LOCAL_PROPS="android/local.properties"
+ANDROID_HOME="$PREFIX/opt/android-sdk"
+
+# 添加 NDK 路徑
+if ! grep -q "ndk.dir" "$LOCAL_PROPS" 2>/dev/null; then
+    echo "ndk.dir=$ANDROID_HOME/ndk/$NDK_VERSION" >> "$LOCAL_PROPS"
+    echo "  Added NDK path to $LOCAL_PROPS"
+else
+    echo "  ndk.dir already set in $LOCAL_PROPS"
+fi
+
+echo -e "${GREEN}[2/4]${NC} Configuring gradle.properties..."
 
 GRADLE_PROPS="android/gradle.properties"
 
@@ -51,7 +64,8 @@ if ! grep -q "android.enableJetifier" "$GRADLE_PROPS" 2>/dev/null; then
 fi
 
 if ! grep -q "aapt2FromMavenOverride" "$GRADLE_PROPS" 2>/dev/null; then
-    echo "android.aapt2FromMavenOverride=$PREFIX/bin/aapt2" >> "$GRADLE_PROPS"
+    # 使用 SDK 的 aapt2，不是 $PREFIX/bin/aapt2（版本太舊）
+    echo "android.aapt2FromMavenOverride=$PREFIX/opt/android-sdk/build-tools/35.0.0/aapt2" >> "$GRADLE_PROPS"
 fi
 
 if ! grep -q "org.gradle.jvmargs" "$GRADLE_PROPS" 2>/dev/null; then
@@ -60,17 +74,21 @@ fi
 
 echo "  Updated: $GRADLE_PROPS"
 
-echo -e "${GREEN}[2/3]${NC} Configuring build.gradle.kts..."
+echo -e "${GREEN}[3/4]${NC} Configuring build.gradle.kts..."
 
 BUILD_GRADLE="android/app/build.gradle.kts"
 BUILD_GRADLE_GROOVY="android/app/build.gradle"
 
 if [ -f "$BUILD_GRADLE" ]; then
     # Kotlin DSL
-    if ! grep -q "ndkVersion" "$BUILD_GRADLE" 2>/dev/null; then
-        # 在 android { 後面插入 ndkVersion
+    if grep -q "flutter.ndkVersion" "$BUILD_GRADLE" 2>/dev/null; then
+        # 替換 flutter.ndkVersion 為具體版本號
+        sed -i 's/ndkVersion = flutter.ndkVersion/ndkVersion = "'"$NDK_VERSION"'"/g' "$BUILD_GRADLE"
+        echo "  Updated: $BUILD_GRADLE (replaced flutter.ndkVersion)"
+    elif ! grep -q "ndkVersion" "$BUILD_GRADLE" 2>/dev/null; then
+        # 沒有 ndkVersion，在 android { 後面插入
         sed -i 's/android {/android {\n    ndkVersion = "'"$NDK_VERSION"'"/' "$BUILD_GRADLE"
-        echo "  Updated: $BUILD_GRADLE"
+        echo "  Updated: $BUILD_GRADLE (added ndkVersion)"
     else
         echo "  ndkVersion already set in $BUILD_GRADLE"
     fi
@@ -86,7 +104,7 @@ else
     echo -e "${YELLOW}Warning: Could not find build.gradle file${NC}"
 fi
 
-echo -e "${GREEN}[3/3]${NC} Verifying configuration..."
+echo -e "${GREEN}[4/4]${NC} Verifying configuration..."
 
 echo ""
 echo "gradle.properties contents:"
