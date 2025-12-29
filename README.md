@@ -42,19 +42,51 @@
 
 > ✅ **已驗證**：本專案已在 Android 16 設備上成功運行 Flutter 應用！
 
-### 🏆 達成目標：原生支援 `flutter build apk`
+### 🏆 世界首個完整 Flutter 開發環境
 
-本專案是**世界首個**在 ARM64 Termux 上實現原生 `flutter build apk --release` 的解決方案！
+本專案是**世界首個**在 ARM64 Termux 上實現**完整 Flutter 開發流程**的解決方案！
 
-| 專案 | `flutter build apk` | 方式 |
-|------|---------------------|------|
-| **本專案** | ✅ **已實現** | 交叉編譯 gen_snapshot + ARM64 NDK |
-| Flutter 官方 | ❌ 不支援 | [Issue #177936](https://github.com/flutter/flutter/issues/177936): "arm64 hosts is currently not supported" |
-| [mumumusuc/termux-flutter](https://github.com/mumumusuc/termux-flutter) | ❌ 不支援 | 只有 `flutter run -d linux` |
-| [Hax4us/flutter_in_termux](https://github.com/Hax4us/flutter_in_termux) | ⚠️ 需要 proot | 透過 x86 模擬層，效能較差 |
-| [bdloser404/Fluttermux](https://github.com/bdloser404/Fluttermux) | ❌ 已失效 | Termux 移除 gpkg-dev 後無法使用 |
+#### 🎯 我們能做到什麼？
+
+| 功能 | 本專案 | 其他方案 |
+|------|--------|----------|
+| `flutter build apk` | ✅ **原生支援** | ❌ 無法實現 |
+| `flutter run` + Hot Reload | ✅ **完整支援** | ❌ 無法實現 |
+| 效能 | ✅ **原生速度** | ⚠️ x86 模擬，慢 3-5 倍 |
+| 安裝難度 | ✅ **一鍵安裝** | ⚠️ 複雜配置 |
+| APK 大小 | ✅ **正常 (~17MB)** | ⚠️ proot 增加額外開銷 |
+
+#### 📊 完整功能對比
+
+| 專案 | build apk | flutter run | hot reload | 原生運行 | 維護狀態 |
+|------|-----------|-------------|------------|----------|----------|
+| **本專案** | ✅ | ✅ | ✅ | ✅ | ✅ 活躍 |
+| Flutter 官方 | ❌ | ❌ | ❌ | ❌ | [Issue #177936](https://github.com/flutter/flutter/issues/177936): 不支援 |
+| [mumumusuc/termux-flutter](https://github.com/mumumusuc/termux-flutter) | ❌ | ⚠️ linux only | ❌ | ✅ | ⚠️ 停更 |
+| [Hax4us/flutter_in_termux](https://github.com/Hax4us/flutter_in_termux) | ⚠️ proot | ⚠️ proot | ❌ | ❌ x86 模擬 | ⚠️ 停更 |
+| [bdloser404/Fluttermux](https://github.com/bdloser404/Fluttermux) | ❌ | ❌ | ❌ | ❌ | ❌ 已失效 |
 
 > 💡 如果你發現其他能原生支援的專案，歡迎[開 Issue](https://github.com/ImL1s/termux-flutter-wsl/issues) 告訴我們！
+
+#### 🚀 這意味著什麼？
+
+**你可以在手機/平板上完成完整的 Flutter 開發：**
+
+```
+📱 你的 Android 設備
+    ↓
+🖥️ Termux 終端
+    ↓
+✍️ 編寫程式碼 (vim/nano/code-server)
+    ↓
+🔥 flutter run → 即時看到變更 (Hot Reload!)
+    ↓
+📦 flutter build apk → 產出可安裝的 APK
+    ↓
+📲 直接安裝到設備上測試
+```
+
+**不需要電腦、不需要模擬器、不需要雲端服務！**
 
 ### 📊 功能狀態
 
@@ -134,9 +166,8 @@ curl -sL https://raw.githubusercontent.com/ImL1s/termux-flutter-wsl/master/insta
 curl -sL https://raw.githubusercontent.com/ImL1s/termux-flutter-wsl/master/install_termux_flutter.sh | bash
 ```
 
-安裝完成後：
+安裝完成後，**重啟 Termux** 或執行：
 ```bash
-source ~/.bashrc
 flutter doctor
 ```
 
