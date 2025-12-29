@@ -2,10 +2,14 @@
   <img src="assets/banner.png" alt="termux-flutter-wsl" width="800"/>
 </p>
 
-<h1 align="center">termux-flutter-wsl</h1>
+<h1 align="center">Flutter for Termux ARM64</h1>
 
 <p align="center">
-  <strong>在 WSL 環境下為 Termux 交叉編譯 Flutter SDK</strong>
+  <strong>🚀 世界首個在手機上完整運行 Flutter 開發環境的解決方案</strong>
+</p>
+
+<p align="center">
+  <code>flutter build apk</code> ✅ | <code>flutter run</code> + Hot Reload ✅ | 原生速度 ✅ | 一鍵安裝 ✅
 </p>
 
 <p align="center">
@@ -15,8 +19,8 @@
 <p align="center">
   <img src="https://img.shields.io/badge/Flutter-3.35.0-02569B?logo=flutter" alt="Flutter Version"/>
   <img src="https://img.shields.io/badge/Platform-ARM64-green" alt="Platform"/>
-  <img src="https://img.shields.io/badge/Build-WSL-0078D6?logo=windows" alt="WSL"/>
-  <img src="https://img.shields.io/badge/NDK-r27d-orange" alt="NDK"/>
+  <img src="https://img.shields.io/badge/build_apk-✓-success" alt="Build APK"/>
+  <img src="https://img.shields.io/badge/hot_reload-✓-success" alt="Hot Reload"/>
   <img src="https://img.shields.io/badge/License-GPL--3.0-blue" alt="License"/>
 </p>
 
