@@ -64,9 +64,10 @@
 | `flutter create` | ✅ 已驗證 | 可創建新專案 |
 | `flutter run -d linux` | ✅ 已驗證 | 需要 Termux:X11 |
 | `flutter build linux` | ✅ 已驗證 | 產出 ARM64 ELF 執行檔 |
-| `flutter build apk` | ✅ 已驗證 | 需配置 Android SDK (見下方說明) |
+| `flutter build apk` | ✅ 已驗證 | 需執行 post_install.sh |
+| `flutter run` (Android) | ✅ 已驗證 | Hot reload 支援！需執行 post_install.sh |
 
-> ✅ **v3.35.0 正式版**：所有核心功能已驗證可用！APK 構建需要額外安裝 Android SDK，請參考下方「構建 Android APK」章節。
+> ✅ **v3.35.0 正式版**：所有功能已驗證可用！包含 hot reload 支援！
 
 ### ✨ 主要特色
 
@@ -148,16 +149,25 @@ flutter doctor
 pkg update && pkg install x11-repo wget openjdk-21
 
 # 2. 下載安裝包
-wget https://github.com/ImL1s/termux-flutter-wsl/releases/download/v3.35.0/flutter_3.35.0_aarch64.deb
+wget https://github.com/ImL1s/termux-flutter-wsl/releases/download/3.35.0/flutter_3.35.0_aarch64.deb
 
 # 3. 安裝
 dpkg -i flutter_3.35.0_aarch64.deb
 apt --fix-broken install -y
 
-# 4. 載入環境並驗證
+# 4. 執行 post-install 腳本（配置 APK 構建和 hot reload）
+bash $PREFIX/share/flutter/post_install.sh
+
+# 5. 載入環境並驗證
 source $PREFIX/etc/profile.d/flutter.sh
 flutter doctor
 ```
+
+> ⚠️ **重要**：`post_install.sh` 會下載並配置必要的環境，包括：
+> - Android API 34 平台
+> - 官方 Dart SDK snapshots（hot reload 必需）
+> - Android cmdline-tools
+> - ELF 二進制清理（修復 linker warning）
 
 ### 自行編譯（WSL 環境）
 
@@ -451,6 +461,34 @@ flutter build apk --release
 </details>
 
 </details>
+
+### 在本機運行 Flutter App（Hot Reload）
+
+在 Termux 中直接運行 Flutter app 並支援 hot reload：
+
+```bash
+# 1. 啟用無線調試
+#    設定 → 開發者選項 → 無線調試 → 開啟
+
+# 2. 配對設備（首次需要）
+#    點擊「使用配對碼配對設備」，記下配對碼和端口
+adb pair 127.0.0.1:<配對端口>
+# 輸入配對碼
+
+# 3. 連接設備
+adb connect 127.0.0.1:<連接端口>
+
+# 4. 運行 Flutter app
+cd your_flutter_project
+flutter run
+```
+
+> 💡 連接成功後會顯示：
+> ```
+> Flutter run key commands.
+> r Hot reload. 🔥🔥🔥
+> R Hot restart.
+> ```
 
 ### 部署到 Android 設備
 
