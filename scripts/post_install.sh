@@ -17,8 +17,33 @@ SYSROOT=$PREBUILT/linux-x86_64/sysroot
 CLANG_LIB=$PREBUILT/linux-x86_64/lib/clang/18/lib/linux
 DART_SDK=$FLUTTER_ROOT/bin/cache/dart-sdk
 
-# 0. 清理 ELF 二進制的 DT_RPATH (修復 flutter run crash)
-echo "[0/12] Cleaning ELF binaries (fix flutter run)..."
+# Get engine version for downloads
+ENGINE_VERSION=$(cat $FLUTTER_ROOT/bin/internal/engine.version 2>/dev/null || echo "1e9a811bf8e70466596bcf0ea3a8b5adb5f17f7f")
+
+# 0. 下載官方 Dart SDK snapshots (修復 flutter run hot reload)
+echo "[0/13] Downloading official Dart SDK snapshots (for hot reload)..."
+SNAPSHOTS_URL="https://storage.googleapis.com/flutter_infra_release/flutter/${ENGINE_VERSION}/dart-sdk-linux-arm64.zip"
+SNAPSHOTS_DIR=$DART_SDK/bin/snapshots
+
+# Check if key snapshot is missing
+if [ ! -f "$SNAPSHOTS_DIR/dds_aot.dart.snapshot" ]; then
+    echo "  Downloading dart-sdk-linux-arm64.zip..."
+    cd /tmp
+    curl -L -o dart-sdk.zip "$SNAPSHOTS_URL"
+    echo "  Extracting snapshots..."
+    unzip -o -j dart-sdk.zip 'dart-sdk/bin/snapshots/*' -d "$SNAPSHOTS_DIR"
+    rm dart-sdk.zip
+
+    # Create symlinks for non-AOT versions
+    ln -sf frontend_server_aot.dart.snapshot "$SNAPSHOTS_DIR/frontend_server.dart.snapshot" 2>/dev/null || true
+
+    echo "  ✓ Dart SDK snapshots installed"
+else
+    echo "  ✓ Dart SDK snapshots already exist"
+fi
+
+# 1. 清理 ELF 二進制的 DT_RPATH (修復 flutter run crash)
+echo "[1/13] Cleaning ELF binaries (fix flutter run)..."
 pkg install -y termux-elf-cleaner 2>/dev/null || true
 
 # Clean dart binaries to remove DT_RPATH warnings that crash flutter run
@@ -34,8 +59,8 @@ else
     echo "  ⚠ termux-elf-cleaner not found, skipping"
 fi
 
-# 1. 下載並安裝 Android API 34 (aapt2 bug workaround)
-echo "[1/12] Installing Android API 34..."
+# 2. 下載並安裝 Android API 34 (aapt2 bug workaround)
+echo "[2/13] Installing Android API 34..."
 if [ ! -d "$ANDROID_SDK/platforms/android-34" ]; then
     cd $ANDROID_SDK/platforms
     curl -L -o platform-34.zip 'https://dl.google.com/android/repository/platform-34-ext7_r02.zip'
@@ -47,7 +72,7 @@ else
 fi
 
 # 2. 修改 FlutterPluginConstants.kt (僅構建 ARM64)
-echo "[2/12] Configuring Flutter for ARM64 only..."
+echo "[3/13] Configuring Flutter for ARM64 only..."
 cat > $FLUTTER_ROOT/packages/flutter_tools/gradle/src/main/kotlin/FlutterPluginConstants.kt << 'EOF'
 package com.flutter.gradle
 
@@ -88,7 +113,7 @@ EOF
 echo "  ✓ FlutterPluginConstants.kt updated"
 
 # 3. 創建 NDK clang wrapper
-echo "[3/12] Creating NDK clang wrappers..."
+echo "[4/13] Creating NDK clang wrappers..."
 mkdir -p $PREBUILT/bin
 
 cat > $PREBUILT/bin/clang << 'EOF'
@@ -149,7 +174,7 @@ chmod +x $PREBUILT/bin/clang++
 echo "  ✓ clang wrappers created"
 
 # 4. 修補 NDK toolchain cmake
-echo "[4/12] Patching NDK toolchain cmake..."
+echo "[5/13] Patching NDK toolchain cmake..."
 TOOLCHAIN=$NDK/build/cmake/android-legacy.toolchain.cmake
 if grep -q 'list(APPEND ANDROID_LINKER_FLAGS "-static-libstdc++")' $TOOLCHAIN 2>/dev/null; then
     sed -i 's/list(APPEND ANDROID_LINKER_FLAGS "-static-libstdc++")/# Disabled for Termux: list(APPEND ANDROID_LINKER_FLAGS "-static-libstdc++")/' $TOOLCHAIN
@@ -159,7 +184,7 @@ else
 fi
 
 # 5. 創建 sysroot 符號連結
-echo "[5/12] Creating sysroot symlinks..."
+echo "[6/13] Creating sysroot symlinks..."
 ln -sf linux-x86_64/sysroot $PREBUILT/sysroot 2>/dev/null || true
 ln -sf 18 $PREBUILT/linux-x86_64/lib/clang/21 2>/dev/null || true
 
@@ -169,7 +194,7 @@ ln -sf aarch64-linux-android/24 $SYSROOT_LIB/aarch64-none-linux-android24 2>/dev
 echo "  ✓ Sysroot symlinks created"
 
 # 6. 複製運行時庫
-echo "[6/12] Copying runtime libraries..."
+echo "[7/13] Copying runtime libraries..."
 for f in libunwind.a libatomic.a; do
     ln -sf $CLANG_LIB/aarch64/$f $SYSROOT_LIB/aarch64-linux-android/$f 2>/dev/null || true
     ln -sf $CLANG_LIB/aarch64/$f $SYSROOT_LIB/aarch64-linux-android/24/$f 2>/dev/null || true
@@ -179,7 +204,7 @@ done
 echo "  ✓ Runtime libraries linked"
 
 # 7. 創建 build-tools 符號連結
-echo "[7/12] Creating build-tools symlinks..."
+echo "[8/13] Creating build-tools symlinks..."
 BUILD_TOOLS=$ANDROID_SDK/build-tools/35.0.0
 mkdir -p $BUILD_TOOLS/lib
 
@@ -218,7 +243,7 @@ ln -sf /data/data/com.termux/files/usr/share/java/d8.jar $BUILD_TOOLS/lib/dx.jar
 echo "  ✓ Build-tools symlinks created"
 
 # 8. 安裝 cmdline-tools (讓 flutter 檢測 Android 設備)
-echo "[8/12] Installing cmdline-tools..."
+echo "[9/13] Installing cmdline-tools..."
 if [ ! -d "$ANDROID_SDK/cmdline-tools/latest" ]; then
     mkdir -p $ANDROID_SDK/cmdline-tools
     cd $ANDROID_SDK/cmdline-tools
@@ -232,21 +257,21 @@ else
 fi
 
 # 9. 創建 platform-tools 符號連結 (adb)
-echo "[9/12] Creating platform-tools symlinks..."
+echo "[10/13] Creating platform-tools symlinks..."
 mkdir -p $ANDROID_SDK/platform-tools
 ln -sf /data/data/com.termux/files/usr/bin/adb $ANDROID_SDK/platform-tools/adb 2>/dev/null || true
 ln -sf /data/data/com.termux/files/usr/bin/fastboot $ANDROID_SDK/platform-tools/fastboot 2>/dev/null || true
 echo "  ✓ platform-tools symlinks created"
 
 # 10. 接受 Android licenses
-echo "[10/12] Accepting Android licenses..."
+echo "[11/13] Accepting Android licenses..."
 mkdir -p $ANDROID_SDK/licenses
 echo -e "\n24333f8a63b6825ea9c5514f83c2829b004d1fee" > $ANDROID_SDK/licenses/android-sdk-license
 echo -e "\n84831b9409646a918e30573bab4c9c91346d8abd" > $ANDROID_SDK/licenses/android-sdk-preview-license
 echo "  ✓ Android licenses accepted"
 
 # 11. 複製 VM snapshots (for debug mode)
-echo "[11/12] Checking engine artifacts..."
+echo "[12/13] Checking engine artifacts..."
 ENGINE_DIR=$FLUTTER_ROOT/bin/cache/artifacts/engine/linux-arm64
 
 if [ ! -f "$ENGINE_DIR/vm_isolate_snapshot.bin" ]; then
