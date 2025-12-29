@@ -19,6 +19,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/Flutter-3.35.0-02569B?logo=flutter" alt="Flutter Version"/>
   <img src="https://img.shields.io/badge/Platform-ARM64-green" alt="Platform"/>
+  <img src="https://img.shields.io/badge/Build-WSL-0078D6?logo=windows" alt="WSL"/>
   <img src="https://img.shields.io/badge/build_apk-✓-success" alt="Build APK"/>
   <img src="https://img.shields.io/badge/hot_reload-✓-success" alt="Hot Reload"/>
   <img src="https://img.shields.io/badge/License-GPL--3.0-blue" alt="License"/>
