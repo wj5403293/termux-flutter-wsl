@@ -2,6 +2,73 @@
 
 本文檔說明如何從零開始構建包含 Android gen_snapshot 的 Flutter deb 包。
 
+## 技術架構總覽
+
+### 我們編譯的組件（WSL 交叉編譯）
+
+| 組件 | 檔案 | 大小 | 用途 |
+|------|------|------|------|
+| **Dart SDK** | `dart-sdk/bin/dart` | ~50MB | Flutter 命令核心 |
+| **Flutter Engine** | `libflutter_linux_gtk.so` | ~106MB | Linux 桌面運行時 |
+| **gen_snapshot (Linux)** | `linux-arm64/gen_snapshot` | ~30MB | `flutter build linux` |
+| **gen_snapshot (Android)** | `android-arm64-release/.../gen_snapshot` | ~30MB | `flutter build apk` |
+| **impellerc** | `impellerc` | ~20MB | Shader 編譯器 |
+| **const_finder** | `const_finder.dart.snapshot` | ~1MB | Icon tree shaking |
+
+### 下載的預編譯組件（第三方）
+
+| 來源 | 組件 | 用途 |
+|------|------|------|
+| [mumumusuc/termux-android-sdk](https://github.com/mumumusuc/termux-android-sdk) | aapt2, d8, build-tools | Android 構建工具 |
+| [lzhiyong/termux-ndk](https://github.com/lzhiyong/termux-ndk) | ARM64 NDK (clang, linker) | Native 編譯 |
+| Google Storage | Dart snapshots (dds_aot, etc.) | Hot reload 支援 |
+
+### 應用的補丁
+
+| 補丁檔案 | 解決的問題 |
+|----------|-----------|
+| `patches/engine.patch` | Bionic TLS 對齊、`-llog -lm` 連結、dynamic linker 路徑 |
+| `patches/dart.patch` | Dart SDK Termux 適配 |
+| `FlutterPluginConstants.kt` | 預設只編譯 ARM64（其他架構無法交叉編譯） |
+| `post_install.sh` | NDK wrapper、sysroot symlinks、下載官方 snapshots |
+
+### 架構圖
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        WSL 構建環境                              │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐  │
+│  │ Dart SDK    │  │ Flutter     │  │ gen_snapshot            │  │
+│  │ (ARM64)     │  │ Engine      │  │ ├─ Linux ARM64          │  │
+│  │             │  │ (ARM64)     │  │ └─ Android ARM64        │  │
+│  └─────────────┘  └─────────────┘  └─────────────────────────┘  │
+│         │               │                    │                   │
+│         └───────────────┴────────────────────┘                   │
+│                         │                                        │
+│                    [打包 deb]                                    │
+│                         │                                        │
+└─────────────────────────┼────────────────────────────────────────┘
+                          ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                     Termux 運行環境                              │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐  │
+│  │ 我們的 deb  │  │ Android SDK │  │ ARM64 NDK               │  │
+│  │ (編譯產物)  │  │ (下載)      │  │ (下載)                  │  │
+│  └─────────────┘  └─────────────┘  └─────────────────────────┘  │
+│         │               │                    │                   │
+│         └───────────────┴────────────────────┘                   │
+│                         │                                        │
+│              [post_install.sh 整合]                              │
+│                         │                                        │
+│                         ▼                                        │
+│  ┌─────────────────────────────────────────────────────────┐    │
+│  │ flutter doctor ✅  flutter build apk ✅  flutter run ✅  │    │
+│  └─────────────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
 ## 構建環境需求
 
 - Windows 11 + WSL2 (Ubuntu 22.04+)
