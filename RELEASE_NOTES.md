@@ -37,7 +37,7 @@ flutter doctor
 | `flutter build apk --profile` | ✅ 已驗證 | |
 | `flutter build linux` | ✅ 已驗證 | 需 Termux:X11 |
 | `flutter run -d linux` | ✅ 已驗證 | 需 Termux:X11 |
-| `flutter run` (Android) | ⚠️ 部分支援 | App 可運行，但 hot reload 有問題 |
+| `flutter run` (Android) | ✅ 已驗證 | 需執行 post_install.sh |
 
 ## 系統需求
 
@@ -93,8 +93,7 @@ android.aapt2FromMavenOverride=/data/data/com.termux/files/usr/bin/aapt2
 ## 已知限制
 
 - 僅支援 `android-arm64` 目標（不支援 android-arm、android-x64）
-- `flutter run` 的 hot reload 功能可能有問題（linker warning 干擾）
-- 需要手動執行 post_install.sh 配置 APK 構建環境
+- 需要手動執行 post_install.sh 配置環境（包含 hot reload 支援）
 
 ## 技術說明
 
