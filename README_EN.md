@@ -212,7 +212,7 @@ This installs adb 1.0.39 (android-8.0.0), which works on Android 9 and older dev
 One command installs Flutter + Android SDK + NDK, ready to `flutter build apk`:
 
 ```bash
-curl -sL https://raw.githubusercontent.com/ImL1s/termux-flutter-wsl/master/install_flutter_complete.sh | bash
+curl -sL https://raw.githubusercontent.com/ImL1s/termux-flutter-wsl/master/install_flutter_complete.sh -o ~/install.sh && bash ~/install.sh
 ```
 
 > This script auto-installs Flutter, Android SDK, ARM64 NDK, and tests APK build.
@@ -223,7 +223,7 @@ curl -sL https://raw.githubusercontent.com/ImL1s/termux-flutter-wsl/master/insta
 If you only need `flutter run -d linux`, no APK building:
 
 ```bash
-curl -sL https://raw.githubusercontent.com/ImL1s/termux-flutter-wsl/master/install_termux_flutter.sh | bash
+curl -sL https://raw.githubusercontent.com/ImL1s/termux-flutter-wsl/master/install_termux_flutter.sh -o ~/install.sh && bash ~/install.sh
 ```
 
 After install, **restart Termux** then run:

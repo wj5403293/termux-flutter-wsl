@@ -212,7 +212,7 @@ flutter doctor
 一個命令安裝 Flutter + Android SDK + NDK，完成後直接可以 `flutter build apk`：
 
 ```bash
-curl -sL https://raw.githubusercontent.com/ImL1s/termux-flutter-wsl/master/install_flutter_complete.sh | bash
+curl -sL https://raw.githubusercontent.com/ImL1s/termux-flutter-wsl/master/install_flutter_complete.sh -o ~/install.sh && bash ~/install.sh
 ```
 
 > 此腳本會自動安裝 Flutter、Android SDK、ARM64 NDK，並測試 APK 構建。
@@ -223,7 +223,7 @@ curl -sL https://raw.githubusercontent.com/ImL1s/termux-flutter-wsl/master/insta
 如果只需要 `flutter run -d linux`，不需要構建 APK：
 
 ```bash
-curl -sL https://raw.githubusercontent.com/ImL1s/termux-flutter-wsl/master/install_termux_flutter.sh | bash
+curl -sL https://raw.githubusercontent.com/ImL1s/termux-flutter-wsl/master/install_termux_flutter.sh -o ~/install.sh && bash ~/install.sh
 ```
 
 安裝完成後，**重啟 Termux** 或執行：

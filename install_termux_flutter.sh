@@ -3,7 +3,7 @@
 # Termux Flutter 一鍵安裝腳本
 # One-click installer for Flutter development on Termux
 #
-# Usage: curl -sL https://raw.githubusercontent.com/ImL1s/termux-flutter-wsl/master/install_termux_flutter.sh | bash
+# Usage: curl -sL https://raw.githubusercontent.com/ImL1s/termux-flutter-wsl/master/install_termux_flutter.sh -o ~/install.sh && bash ~/install.sh
 #
 # 當前狀態 (v3.35.0):
 #   - flutter doctor: ✅ 已驗證

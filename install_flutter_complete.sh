@@ -3,7 +3,7 @@
 # Termux Flutter 完整安裝腳本
 # Complete Flutter + Android SDK Installation for Termux
 #
-# Usage: curl -sL https://raw.githubusercontent.com/ImL1s/termux-flutter-wsl/master/install_flutter_complete.sh | bash
+# Usage: curl -sL https://raw.githubusercontent.com/ImL1s/termux-flutter-wsl/master/install_flutter_complete.sh -o ~/install.sh && bash ~/install.sh
 # Version: 2025-12-30 v2
 #
 # 這個腳本會自動完成：
