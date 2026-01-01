@@ -50,7 +50,8 @@ TOTAL_STEPS=5
 
 echo -e "${GREEN}[1/${TOTAL_STEPS}]${NC} Updating packages..."
 pkg update -y
-pkg upgrade -y
+# Use non-interactive mode to avoid config file prompts
+DEBIAN_FRONTEND=noninteractive apt-get -o Dpkg::Options::="--force-confold" -o Dpkg::Options::="--force-confdef" upgrade -y
 
 echo -e "${GREEN}[2/${TOTAL_STEPS}]${NC} Installing dependencies..."
 pkg install -y x11-repo
