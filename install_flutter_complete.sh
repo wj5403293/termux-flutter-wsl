@@ -4,7 +4,7 @@
 # Complete Flutter + Android SDK Installation for Termux
 #
 # Usage: curl -sL https://raw.githubusercontent.com/ImL1s/termux-flutter-wsl/master/install_flutter_complete.sh -o ~/install.sh && bash ~/install.sh
-# Version: 2026-01-05 v4
+# Version: 2026-01-05 v5
 #
 # 這個腳本會自動完成：
 #   1. 安裝 Flutter SDK
@@ -199,12 +199,11 @@ configure_ndk_clang() {
     # 如果不刪除，寫入會修改同一個目標文件
     rm -f "$PREBUILT/linux-x86_64/bin/clang" "$PREBUILT/linux-x86_64/bin/clang++" 2>/dev/null || true
 
-    echo '#!/data/data/com.termux/files/usr/bin/bash' > "$PREBUILT/linux-x86_64/bin/clang"
-    echo "exec /data/data/com.termux/files/usr/bin/clang --rtlib=compiler-rt --unwindlib=none \"\$@\"" >> "$PREBUILT/linux-x86_64/bin/clang"
+    # 使用 printf 寫入 wrapper（比 echo 更可靠）
+    printf '#!/data/data/com.termux/files/usr/bin/bash\nexec /data/data/com.termux/files/usr/bin/clang --rtlib=compiler-rt --unwindlib=none "$@"\n' > "$PREBUILT/linux-x86_64/bin/clang"
     chmod +x "$PREBUILT/linux-x86_64/bin/clang"
 
-    echo '#!/data/data/com.termux/files/usr/bin/bash' > "$PREBUILT/linux-x86_64/bin/clang++"
-    echo "exec /data/data/com.termux/files/usr/bin/clang++ --rtlib=compiler-rt --unwindlib=none \"\$@\"" >> "$PREBUILT/linux-x86_64/bin/clang++"
+    printf '#!/data/data/com.termux/files/usr/bin/bash\nexec /data/data/com.termux/files/usr/bin/clang++ --rtlib=compiler-rt --unwindlib=none "$@"\n' > "$PREBUILT/linux-x86_64/bin/clang++"
     chmod +x "$PREBUILT/linux-x86_64/bin/clang++"
 
     # 創建 bin symlinks
