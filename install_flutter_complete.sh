@@ -4,7 +4,7 @@
 # Complete Flutter + Android SDK Installation for Termux
 #
 # Usage: curl -sL https://raw.githubusercontent.com/ImL1s/termux-flutter-wsl/master/install_flutter_complete.sh -o ~/install.sh && bash ~/install.sh
-# Version: 2026-01-06 v6
+# Version: 2026-01-06 v7
 #
 # 這個腳本會自動完成：
 #   1. 安裝 Flutter SDK
@@ -291,6 +291,23 @@ mkdir -p $ANDROID_HOME/cmake/3.22.1/bin
 ln -sf $PREFIX/bin/cmake $ANDROID_HOME/cmake/3.22.1/bin/cmake
 ln -sf $PREFIX/bin/ninja $ANDROID_HOME/cmake/3.22.1/bin/ninja
 
+# 創建 build-tools symlinks（修復 "Build Tools is corrupted" 錯誤）
+BUILD_TOOLS=$ANDROID_HOME/build-tools/35.0.0
+mkdir -p $BUILD_TOOLS/lib
+for tool in aapt aapt2 apksigner d8 dx zipalign aidl; do
+    ln -sf $PREFIX/bin/$tool $BUILD_TOOLS/$tool 2>/dev/null || true
+done
+# d8.jar and dx.jar
+ln -sf $PREFIX/share/java/d8.jar $BUILD_TOOLS/lib/d8.jar 2>/dev/null || true
+ln -sf $PREFIX/share/java/d8.jar $BUILD_TOOLS/lib/dx.jar 2>/dev/null || true
+# core-lambda-stubs.jar (create empty if missing)
+if [ ! -f $BUILD_TOOLS/core-lambda-stubs.jar ]; then
+    echo "Manifest-Version: 1.0" > /tmp/MANIFEST.MF 2>/dev/null || true
+    jar cfm $BUILD_TOOLS/core-lambda-stubs.jar /tmp/MANIFEST.MF 2>/dev/null || true
+    rm -f /tmp/MANIFEST.MF 2>/dev/null || true
+fi
+echo "  ✓ build-tools 已配置"
+
 # 配置 Flutter
 flutter config --android-sdk $ANDROID_HOME 2>/dev/null || true
 
@@ -328,7 +345,12 @@ if [ -d "$TEST_APP_DIR" ]; then
 fi
 
 echo "創建測試專案..."
-flutter create --platforms android "$TEST_APP_DIR" 2>/dev/null
+# 創建包含 Android 和 Linux 支持的專案
+if command -v pkg-config &> /dev/null && pkg-config --exists gtk+-3.0 2>/dev/null; then
+    flutter create --platforms android,linux "$TEST_APP_DIR" 2>/dev/null
+else
+    flutter create --platforms android "$TEST_APP_DIR" 2>/dev/null
+fi
 
 cd "$TEST_APP_DIR"
 
