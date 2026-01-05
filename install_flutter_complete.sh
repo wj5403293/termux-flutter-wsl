@@ -4,7 +4,7 @@
 # Complete Flutter + Android SDK Installation for Termux
 #
 # Usage: curl -sL https://raw.githubusercontent.com/ImL1s/termux-flutter-wsl/master/install_flutter_complete.sh -o ~/install.sh && bash ~/install.sh
-# Version: 2026-01-05 v3
+# Version: 2026-01-05 v4
 #
 # 這個腳本會自動完成：
 #   1. 安裝 Flutter SDK
@@ -195,7 +195,10 @@ configure_ndk_clang() {
     mkdir -p "$PREBUILT/bin"
 
     # 創建 clang wrapper（使用 Termux 的 clang，添加必要的 rtlib 參數）
-    # 注意：使用 echo 而非 heredoc 以避免潛在的編碼問題
+    # 重要：必須先刪除 symlinks，因為 clang++ -> clang -> clang-18
+    # 如果不刪除，寫入會修改同一個目標文件
+    rm -f "$PREBUILT/linux-x86_64/bin/clang" "$PREBUILT/linux-x86_64/bin/clang++" 2>/dev/null || true
+
     echo '#!/data/data/com.termux/files/usr/bin/bash' > "$PREBUILT/linux-x86_64/bin/clang"
     echo "exec /data/data/com.termux/files/usr/bin/clang --rtlib=compiler-rt --unwindlib=none \"\$@\"" >> "$PREBUILT/linux-x86_64/bin/clang"
     chmod +x "$PREBUILT/linux-x86_64/bin/clang"
