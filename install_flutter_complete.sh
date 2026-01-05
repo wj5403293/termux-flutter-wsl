@@ -4,7 +4,7 @@
 # Complete Flutter + Android SDK Installation for Termux
 #
 # Usage: curl -sL https://raw.githubusercontent.com/ImL1s/termux-flutter-wsl/master/install_flutter_complete.sh -o ~/install.sh && bash ~/install.sh
-# Version: 2025-12-30 v2
+# Version: 2026-01-05 v3
 #
 # 這個腳本會自動完成：
 #   1. 安裝 Flutter SDK
@@ -195,16 +195,13 @@ configure_ndk_clang() {
     mkdir -p "$PREBUILT/bin"
 
     # 創建 clang wrapper（使用 Termux 的 clang，添加必要的 rtlib 參數）
-    cat > "$PREBUILT/linux-x86_64/bin/clang" << WRAPPER
-#!/data/data/com.termux/files/usr/bin/bash
-exec /data/data/com.termux/files/usr/bin/clang --rtlib=compiler-rt --unwindlib=none -L$SYSROOT_LIB -L$CLANG_LIB "\$@"
-WRAPPER
+    # 注意：使用 echo 而非 heredoc 以避免潛在的編碼問題
+    echo '#!/data/data/com.termux/files/usr/bin/bash' > "$PREBUILT/linux-x86_64/bin/clang"
+    echo "exec /data/data/com.termux/files/usr/bin/clang --rtlib=compiler-rt --unwindlib=none \"\$@\"" >> "$PREBUILT/linux-x86_64/bin/clang"
     chmod +x "$PREBUILT/linux-x86_64/bin/clang"
 
-    cat > "$PREBUILT/linux-x86_64/bin/clang++" << WRAPPER
-#!/data/data/com.termux/files/usr/bin/bash
-exec /data/data/com.termux/files/usr/bin/clang++ --rtlib=compiler-rt --unwindlib=none -L$SYSROOT_LIB -L$CLANG_LIB "\$@"
-WRAPPER
+    echo '#!/data/data/com.termux/files/usr/bin/bash' > "$PREBUILT/linux-x86_64/bin/clang++"
+    echo "exec /data/data/com.termux/files/usr/bin/clang++ --rtlib=compiler-rt --unwindlib=none \"\$@\"" >> "$PREBUILT/linux-x86_64/bin/clang++"
     chmod +x "$PREBUILT/linux-x86_64/bin/clang++"
 
     # 創建 bin symlinks
@@ -274,10 +271,19 @@ echo "  ✓ 環境已配置"
 echo ""
 echo -e "${GREEN}[6/${TOTAL_STEPS}]${NC} 測試 APK 構建..."
 
-# 安裝 aapt2（如果可用）
+# 安裝 aapt2（手動安裝以避免 openjdk-17 依賴衝突）
 echo "檢查 aapt2..."
 if ! command -v aapt2 &> /dev/null; then
-    pkg install -y aapt2 2>/dev/null || true
+    echo "安裝 aapt2 及其依賴..."
+    cd $HOME
+    # 下載依賴包
+    apt download libprotobuf fmt libzopfli aapt aapt2 2>/dev/null || true
+    # 安裝（使用 dpkg 避免觸發 apt 的依賴解析）
+    dpkg -i libprotobuf*.deb 2>/dev/null || true
+    dpkg -i fmt*.deb libzopfli*.deb 2>/dev/null || true
+    dpkg -i aapt_*.deb 2>/dev/null || true
+    dpkg -i aapt2*.deb 2>/dev/null || true
+    rm -f *.deb 2>/dev/null || true
 fi
 
 TEST_APP_DIR="$HOME/flutter_test_app"
@@ -332,11 +338,22 @@ android {
         ndk {
             abiFilters += "arm64-v8a"
         }
+        externalNativeBuild {
+            cmake {
+                abiFilters("arm64-v8a")
+            }
+        }
     }
 
     buildTypes {
         release {
             signingConfig = signingConfigs.getByName("debug")
+        }
+    }
+
+    splits {
+        abi {
+            isEnable = false
         }
     }
 }
