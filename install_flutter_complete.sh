@@ -4,7 +4,7 @@
 # Complete Flutter + Android SDK Installation for Termux
 #
 # Usage: curl -sL https://raw.githubusercontent.com/ImL1s/termux-flutter-wsl/master/install_flutter_complete.sh -o ~/install.sh && bash ~/install.sh
-# Version: 2026-01-06 v10
+# Version: 2026-01-06 v11
 #
 # 這個腳本會自動完成：
 #   1. 安裝 Flutter SDK
@@ -90,6 +90,12 @@ TOTAL_STEPS=6
 # ========================================
 echo ""
 echo -e "${GREEN}[1/${TOTAL_STEPS}]${NC} 更新系統套件..."
+
+# 清理可能存在的舊包（避免依賴衝突）
+dpkg --purge android-sdk 2>/dev/null || true
+dpkg --purge flutter 2>/dev/null || true
+apt --fix-broken install -y 2>/dev/null || true
+
 pkg update -y
 pkg upgrade -y
 
