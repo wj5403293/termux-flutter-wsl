@@ -4,7 +4,7 @@
 # Complete Flutter + Android SDK Installation for Termux
 #
 # Usage: curl -sL https://raw.githubusercontent.com/ImL1s/termux-flutter-wsl/master/install_flutter_complete.sh -o ~/install.sh && bash ~/install.sh
-# Version: 2026-01-06 v7
+# Version: 2026-01-06 v8
 #
 # 這個腳本會自動完成：
 #   1. 安裝 Flutter SDK
@@ -215,6 +215,13 @@ fi
 configure_ndk_clang() {
     local NDK_DIR="$1"
     local PREBUILT="$NDK_DIR/toolchains/llvm/prebuilt"
+
+    # 跳過空的 NDK stub（android-sdk 包帶的空目錄）
+    if [ ! -d "$PREBUILT/linux-x86_64/bin" ]; then
+        echo "  跳過 NDK stub: $(basename $NDK_DIR)"
+        return
+    fi
+
     local SYSROOT_LIB="$PREBUILT/linux-x86_64/sysroot/usr/lib/aarch64-linux-android"
     local CLANG_LIB="$PREBUILT/linux-x86_64/lib/clang/18/lib/linux/aarch64"
 
