@@ -119,8 +119,15 @@ apt --fix-broken install -y
 # 載入環境
 source $PREFIX/etc/profile.d/flutter.sh 2>/dev/null || true
 
-# NOTE: post_install.sh will be run AFTER NDK installation (Step 4)
-# This ensures NDK clang wrappers are created for the installed NDK
+# 重新編譯 flutter_tools.snapshot（修復 "Unsupported operating system: android" 問題）
+FLUTTER_ROOT=$PREFIX/opt/flutter
+DART_SDK=$FLUTTER_ROOT/bin/cache/dart-sdk
+if [ -f "$DART_SDK/bin/dart" ] && [ -f "$FLUTTER_ROOT/packages/flutter_tools/bin/flutter_tools.dart" ]; then
+    echo "重新編譯 flutter_tools.snapshot..."
+    rm -f "$FLUTTER_ROOT/bin/cache/flutter_tools.snapshot" 2>/dev/null || true
+    $DART_SDK/bin/dart --snapshot="$FLUTTER_ROOT/bin/cache/flutter_tools.snapshot" \
+        "$FLUTTER_ROOT/packages/flutter_tools/bin/flutter_tools.dart" 2>/dev/null || true
+fi
 
 echo "  ✓ Flutter 已安裝"
 
@@ -172,10 +179,56 @@ else
     echo "  ✓ NDK 已安裝"
 fi
 
-# 現在運行 post_install.sh（在 NDK 安裝後）
+# 配置 NDK clang wrappers（支援 ARM64 Termux 編譯 Android 代碼）
+configure_ndk_clang() {
+    local NDK_DIR="$1"
+    local PREBUILT="$NDK_DIR/toolchains/llvm/prebuilt"
+    local SYSROOT_LIB="$PREBUILT/linux-x86_64/sysroot/usr/lib/aarch64-linux-android"
+    local CLANG_LIB="$PREBUILT/linux-x86_64/lib/clang/18/lib/linux/aarch64"
+
+    echo "  配置 NDK clang wrapper: $(basename $NDK_DIR)"
+
+    # 創建 sysroot symlink
+    ln -sf linux-x86_64/sysroot "$PREBUILT/sysroot" 2>/dev/null || true
+
+    # 創建 bin 目錄
+    mkdir -p "$PREBUILT/bin"
+
+    # 創建 clang wrapper（使用 Termux 的 clang，添加必要的 rtlib 參數）
+    cat > "$PREBUILT/linux-x86_64/bin/clang" << WRAPPER
+#!/data/data/com.termux/files/usr/bin/bash
+exec /data/data/com.termux/files/usr/bin/clang --rtlib=compiler-rt --unwindlib=none -L$SYSROOT_LIB -L$CLANG_LIB "\$@"
+WRAPPER
+    chmod +x "$PREBUILT/linux-x86_64/bin/clang"
+
+    cat > "$PREBUILT/linux-x86_64/bin/clang++" << WRAPPER
+#!/data/data/com.termux/files/usr/bin/bash
+exec /data/data/com.termux/files/usr/bin/clang++ --rtlib=compiler-rt --unwindlib=none -L$SYSROOT_LIB -L$CLANG_LIB "\$@"
+WRAPPER
+    chmod +x "$PREBUILT/linux-x86_64/bin/clang++"
+
+    # 創建 bin symlinks
+    ln -sf "$PREBUILT/linux-x86_64/bin/clang" "$PREBUILT/bin/clang"
+    ln -sf "$PREBUILT/linux-x86_64/bin/clang++" "$PREBUILT/bin/clang++"
+
+    # 創建 libc++_shared.a（某些構建需要靜態版本）
+    if [ -f "$SYSROOT_LIB/libc++_static.a" ] && [ ! -f "$PREFIX/lib/libc++_shared.a" ]; then
+        cp "$SYSROOT_LIB/libc++_static.a" "$PREFIX/lib/libc++_shared.a" 2>/dev/null || true
+    fi
+}
+
+# 配置所有已安裝的 NDK
+echo "配置 NDK clang wrappers..."
+for ndk_dir in $ANDROID_HOME/ndk/*/; do
+    if [ -d "$ndk_dir/toolchains/llvm" ]; then
+        configure_ndk_clang "$ndk_dir"
+    fi
+done
+
+# 也運行 post_install.sh（如果存在）
 if [ -f "$PREFIX/share/flutter/post_install.sh" ]; then
-    echo "執行 post_install.sh（配置 NDK clang wrappers）..."
-    bash $PREFIX/share/flutter/post_install.sh
+    echo "執行 post_install.sh..."
+    bash $PREFIX/share/flutter/post_install.sh 2>/dev/null || true
 fi
 
 # ========================================
@@ -221,6 +274,12 @@ echo "  ✓ 環境已配置"
 echo ""
 echo -e "${GREEN}[6/${TOTAL_STEPS}]${NC} 測試 APK 構建..."
 
+# 安裝 aapt2（如果可用）
+echo "檢查 aapt2..."
+if ! command -v aapt2 &> /dev/null; then
+    pkg install -y aapt2 2>/dev/null || true
+fi
+
 TEST_APP_DIR="$HOME/flutter_test_app"
 
 # 創建測試專案
@@ -229,40 +288,79 @@ if [ -d "$TEST_APP_DIR" ]; then
 fi
 
 echo "創建測試專案..."
-flutter create "$TEST_APP_DIR" 2>/dev/null
+flutter create --platforms android "$TEST_APP_DIR" 2>/dev/null
 
 cd "$TEST_APP_DIR"
 
-# 配置專案
+# 配置專案（ARM64 only + compileSdk 34）
+echo "配置專案..."
 echo "ndk.dir=$ANDROID_HOME/ndk/$NDK_VERSION" >> android/local.properties
-sed -i 's/ndkVersion = flutter.ndkVersion/ndkVersion = "'"$NDK_VERSION"'"/g' android/app/build.gradle.kts 2>/dev/null || true
 
-# 首次構建（可能因 AAPT2 或 NDK 問題失敗）
-echo "首次構建（下載依賴）..."
-flutter build apk --release 2>&1 | tee /tmp/build1.log || true
+# 配置 gradle.properties
+cat >> android/gradle.properties << 'PROPS'
+android.aapt2FromMavenOverride=/data/data/com.termux/files/usr/bin/aapt2
+PROPS
+
+# 更新 build.gradle.kts（設置 compileSdk=34，targetSdk=34，abiFilters=arm64-v8a）
+cat > android/app/build.gradle.kts << 'GRADLE'
+plugins {
+    id("com.android.application")
+    id("kotlin-android")
+    id("dev.flutter.flutter-gradle-plugin")
+}
+
+android {
+    namespace = "com.example.flutter_test_app"
+    compileSdk = 34
+    ndkVersion = "27.1.12297006"
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_11
+        targetCompatibility = JavaVersion.VERSION_11
+    }
+
+    kotlinOptions {
+        jvmTarget = JavaVersion.VERSION_11.toString()
+    }
+
+    defaultConfig {
+        applicationId = "com.example.flutter_test_app"
+        minSdk = flutter.minSdkVersion
+        targetSdk = 34
+        versionCode = flutter.versionCode
+        versionName = flutter.versionName
+        ndk {
+            abiFilters += "arm64-v8a"
+        }
+    }
+
+    buildTypes {
+        release {
+            signingConfig = signingConfigs.getByName("debug")
+        }
+    }
+}
+
+flutter {
+    source = "../.."
+}
+GRADLE
+
+# 構建 APK
+echo "構建 APK（這可能需要幾分鐘）..."
+flutter build apk --release --target-platform android-arm64 2>&1 | tee /tmp/build1.log || true
 
 # 檢查是否因 NDK clang 問題失敗（Gradle 可能下載了新 NDK）
 if grep -q "CMAKE_C_COMPILER" /tmp/build1.log 2>/dev/null || grep -q "compiler identification is unknown" /tmp/build1.log 2>/dev/null; then
     echo "檢測到 NDK clang 問題，重新配置..."
-    # Re-run post_install to setup clang wrappers for Gradle-downloaded NDK
-    if [ -f "$PREFIX/share/flutter/post_install.sh" ]; then
-        bash $PREFIX/share/flutter/post_install.sh
-    fi
-fi
-
-# 修復 AAPT2
-if grep -q "EM_X86_64" /tmp/build1.log 2>/dev/null; then
-    echo "修復 AAPT2..."
-    find ~/.gradle/caches -name "aapt2" -path "*aapt2-*-linux*" 2>/dev/null | while read f; do
-        rm -f "$f"
-        ln -s "$ANDROID_HOME/build-tools/35.0.0/aapt2" "$f"
+    # Re-run NDK clang configuration for Gradle-downloaded NDK
+    for ndk_dir in $ANDROID_HOME/ndk/*/; do
+        if [ -d "$ndk_dir/toolchains/llvm" ]; then
+            configure_ndk_clang "$ndk_dir"
+        fi
     done
-fi
-
-# 如果首次構建失敗，再次嘗試
-if [ ! -f "build/app/outputs/flutter-apk/app-release.apk" ]; then
     echo "重新構建..."
-    flutter build apk --release 2>&1 | tee /tmp/build2.log
+    flutter build apk --release --target-platform android-arm64 2>&1 | tee /tmp/build2.log || true
 fi
 
 # 檢查結果
