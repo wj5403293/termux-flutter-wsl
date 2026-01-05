@@ -260,6 +260,43 @@ flutter doctor
 > - Android cmdline-tools
 > - ELF 二進制清理（修復 linker warning）
 
+### 安裝腳本更新日誌 (v13)
+
+最新版安裝腳本修復了多個關鍵問題，確保在乾淨 Termux 環境下所有功能正常：
+
+| 修復項目 | 說明 |
+|----------|------|
+| **libc++_shared.so 符號連結** | 修正指向真實 ELF 庫而非 linker script，解決 ld.lld 崩潰問題 |
+| **Android build tools** | 自動安裝 `d8`, `dx`, `aidl`, `apksigner`, `googletest` |
+| **android-tools** | 自動安裝 `adb` 支援 `flutter run` |
+| **依賴衝突處理** | 自動清理舊包避免 openjdk-17/21 衝突 |
+| **binutils** | 安裝 `ar` 命令用於創建 libatomic.a stub |
+| **NDK clang** | 移除不必要的 wrapper，ARM64 NDK 原生 clang 可直接使用 |
+
+<details>
+<summary><b>🔧 v13 修復的技術細節</b></summary>
+
+**libc++_shared.so 問題**：
+
+NDK 每個 API level 目錄下的 `libc++.so` 實際上是一個 linker script：
+```
+INPUT(-lc++_shared)
+```
+
+之前錯誤地將 `libc++_shared.so` 指向這個 linker script，導致 `ld.lld` 在解析時崩潰（Segmentation fault）。
+
+修正後，`libc++_shared.so` 正確指向父目錄的真實 ELF 共享庫：
+```bash
+# 正確的符號連結
+libc++_shared.so -> ../libc++_shared.so  # 指向真實的 ELF 庫
+```
+
+**NDK clang wrapper 移除**：
+
+ARM64 版 NDK (`lzhiyong/termux-ndk`) 自帶的 `clang-18` 已經是 ARM64 原生二進制，可直接運行，不需要 Termux clang wrapper。使用原生 NDK clang 可避免版本不匹配問題。
+
+</details>
+
 ### 自行編譯（WSL 環境）
 
 ```bash
