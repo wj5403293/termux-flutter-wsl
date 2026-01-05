@@ -1,208 +1,221 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
 # Flutter Termux 專案指南
 
-這是一個用於在 Termux (Android ARM64) 上構建和運行 Flutter 的專案。
+Cross-compile Flutter SDK to run natively on Termux (Android/Bionic ARM64), enabling:
+- `flutter run -d linux` - Run Linux desktop apps in Termux X11
+- `flutter build apk` - Build Android APKs directly in Termux
+- Hot Reload support in Termux environment
 
-## 專案概述
-
-將 Flutter SDK 交叉編譯為可以在 Termux (Android/Bionic ARM64) 上運行的版本，支援：
-- `flutter run -d linux` - 在 Termux X11 環境運行 Linux 桌面應用
-- `flutter build apk` - 在 Termux 中構建 Android APK
-
-## 關鍵檔案
-
-| 檔案 | 用途 |
-|------|------|
-| `build.py` | 主構建腳本，包含所有構建命令 |
-| `build.toml` | 構建配置（Flutter 版本、路徑等） |
-| `package.yaml` | deb 包定義和資源映射 |
-| `patches/engine.patch` | Flutter Engine 的 Termux 適配補丁 |
-| `patches/dart.patch` | Dart SDK 的補丁 |
-| `BUILD_GUIDE.md` | 詳細構建指南和常見問題 |
-
-## 常用命令
+## Build Commands
 
 ```bash
-# 完整構建（推薦）
+# One-command full build (recommended)
 python3 build.py build_all --arch=arm64
 
-# 分步構建
+# Step-by-step build
+python3 build.py clone                           # Clone Flutter repo
+python3 build.py sync                            # Sync dependencies (~30GB)
+python3 build.py patch_engine                    # Apply Termux patches
+python3 build.py sysroot --arch=arm64            # Build sysroot
 python3 build.py configure --arch=arm64 --mode=debug
 python3 build.py build --arch=arm64 --mode=debug
 python3 build.py build_dart --arch=arm64 --mode=debug
 
-# Android gen_snapshot（用於 flutter build apk）
+# Android gen_snapshot (for flutter build apk)
 python3 build.py configure_android --arch=arm64 --mode=release
 python3 build.py build_android_gen_snapshot --arch=arm64 --mode=release
 
-# 打包 deb
+# Package deb
 python3 build.py debuild --arch=arm64
 ```
 
-## 重要構建目標
+## Key Files
 
-在 `build.py` 的 `build()` 方法中，ninja 目標包括：
-- `flutter` - 核心 Flutter 引擎
-- `flutter/shell/platform/linux:flutter_gtk` - Linux 桌面支援（libflutter_linux_gtk.so）
+| File | Purpose |
+|------|---------|
+| `build.py` | Main build script with all build commands (uses Fire CLI) |
+| `build.toml` | Build configuration (Flutter version, NDK path, jobs) |
+| `package.yaml` | Deb package definition and artifact mappings |
+| `sysroot.py` | Termux sysroot assembly from apt packages |
+| `package.py` | Deb packaging logic |
+| `utils.py` | Build utilities and path helpers |
+| `patches/*.patch` | Engine/Dart/Skia patches for Termux compatibility |
+| `scripts/post_install.sh` | Post-installation setup for APK builds |
+| `BUILD_GUIDE.md` | Detailed build guide and troubleshooting |
 
-**注意**：`flutter_gtk` 目標必須啟用，否則 `flutter build linux` 會失敗。
+## Architecture Overview
 
-## 構建產物位置
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                   WSL Build Environment                          │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐  │
+│  │ Dart SDK    │  │ Flutter     │  │ gen_snapshot            │  │
+│  │ (ARM64)     │  │ Engine      │  │ ├─ Linux ARM64          │  │
+│  │             │  │ (ARM64)     │  │ └─ Android ARM64        │  │
+│  └─────────────┘  └─────────────┘  └─────────────────────────┘  │
+│                         │                                        │
+│                    [Package deb]                                 │
+└─────────────────────────┼────────────────────────────────────────┘
+                          ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                   Termux Runtime Environment                     │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐  │
+│  │ Our deb     │  │ Android SDK │  │ ARM64 NDK               │  │
+│  │ (compiled)  │  │ (download)  │  │ (download)              │  │
+│  └─────────────┘  └─────────────┘  └─────────────────────────┘  │
+│                         │                                        │
+│              [post_install.sh integration]                       │
+│                         ▼                                        │
+│  flutter doctor ✅  flutter build apk ✅  flutter run ✅         │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+## Build Artifacts Location
 
 ```
 flutter/engine/src/out/
 ├── linux_debug_arm64/
-│   ├── dart-sdk/bin/dart          # Dart 二進制
-│   ├── gen_snapshot              # Linux gen_snapshot
-│   └── libflutter_linux_gtk.so   # Linux GTK 庫（106MB）
+│   ├── dart-sdk/bin/dart          # Dart binary
+│   ├── gen_snapshot               # Linux gen_snapshot
+│   └── libflutter_linux_gtk.so    # Linux GTK library (~106MB)
 └── android_release_arm64/
-    └── clang_arm64/gen_snapshot  # Android gen_snapshot
+    └── clang_arm64/gen_snapshot   # Android gen_snapshot
 ```
 
-## 已知問題與解決方案
+## Ninja Build Targets
 
-詳見 `BUILD_GUIDE.md` 的「構建常見問題與解決方案 (坑)」章節，包括：
-1. vpython3 not found - 需創建 wrapper script
-2. openjdk-17 不存在 - 使用 openjdk-21 + 強制配置
-3. libflutter_linux_gtk.so 缺失 - 啟用 flutter_gtk 目標
-4. CRLF 換行符問題 - Windows/WSL 環境
-5. dartaotruntime 缺失
-6. ADB 遠程安裝失敗 - 需啟用 allow-external-apps
+In `build.py` `build()` method:
+- `flutter` - Core Flutter engine
+- `flutter/shell/platform/linux:flutter_gtk` - Linux desktop support (libflutter_linux_gtk.so)
 
-## 測試設備
+**Important**: `flutter_gtk` target must be enabled, otherwise `flutter build linux` fails.
 
-- Termux 平板：設備 ID `R52Y100VWGM`
-- **SSH 連接（推薦）**：`ssh -p 8022 <IP>` （比 ADB broadcast 更可靠）
-- ADB 連接：`adb -s R52Y100VWGM shell`
-- 獲取 IP：`adb -s R52Y100VWGM shell "ip addr show wlan0 | grep inet"`
+## Known Limitations
 
-## 部署步驟
+1. **APK only supports ARM64**: android-arm and android-x64 gen_snapshot cannot be cross-compiled (BoringSSL 32-bit issues, sysroot incompatibility)
+2. Uses debug mode binaries due to sysroot conflicts (glibc vs bionic headers)
+3. See `BUILD_GUIDE.md` for detailed troubleshooting
 
-**重要**：在 Git Bash/MINGW 中 adb push 路徑會被錯誤轉換。必須用 PowerShell：
+## Common Issues
 
-```powershell
-# 1. 傳輸 deb 到 Termux（必須用 PowerShell！）
-powershell -Command "adb -s R52Y100VWGM push 'D:\flutter_temp.deb' '/data/local/tmp/flutter_new.deb'"
+### NDK Clang Wrapper Not Found
+**Error**: `CMAKE_C_COMPILER is not a full path to an existing compiler tool`
 
-# 2. 在 Termux 中安裝
-pkg install x11-repo
-dpkg -i /sdcard/Download/flutter_3.35.0_aarch64.deb
-apt-get install -f
+**Cause**: Gradle downloaded a new NDK version after `post_install.sh` ran.
 
-# 3. 測試
-source /data/data/com.termux/files/usr/etc/profile.d/flutter.sh
-flutter doctor -v
-flutter build apk --release
+**Fix**: Re-run post_install to configure all NDKs:
+```bash
+bash $PREFIX/share/flutter/post_install.sh
 ```
 
-## WSL 構建環境
+### libflutter_linux_gtk.so Not Found
+**Error**: `Unsupported file type "notFound" for libflutter_linux_gtk.so`
+
+**Cause**: The deb package may be missing the Linux GTK library.
+
+**Fix**: Rebuild with `flutter_gtk` target enabled in `build.py`.
+
+## WSL Build Environment
 
 ```
-主機: Windows + WSL2 Ubuntu
-CPU: AMD Ryzen 9950X3D (16核32線程)
-構建目錄: /home/iml1s/projects/termux-flutter/
-Engine 源碼: /home/iml1s/projects/termux-flutter/flutter/engine/src/
-構建輸出: /home/iml1s/projects/termux-flutter/flutter/engine/src/out/
-推薦並行數: -j24 (留 8 線程給系統)
+Host: Windows + WSL2 Ubuntu
+Build dir: /home/iml1s/projects/termux-flutter/
+Engine src: /home/iml1s/projects/termux-flutter/flutter/engine/src/
+Output: /home/iml1s/projects/termux-flutter/flutter/engine/src/out/
+Recommended jobs: -j24
 ```
 
-### Windows PATH 污染問題
+### Windows PATH Pollution Fix
 
-**問題**：從 Windows 呼叫 `wsl` 時，Windows PATH 會傳遞到 WSL，導致 `/bin/sh` 語法錯誤（因為 "Program Files (x86)" 中的括號）。
+When calling `wsl` from Windows, Windows PATH leaks into WSL causing shell errors.
 
-**解決方案**：
-
-1. 在 WSL 創建 `/etc/wsl.conf`：
+1. Create `/etc/wsl.conf` in WSL:
 ```ini
 [interop]
 appendWindowsPath = false
 ```
 
-2. 創建 vpython3 wrapper（ninja 需要）：
+2. Create vpython3 wrapper in depot_tools:
 ```bash
-# 在 depot_tools 目錄創建
 echo '#!/bin/bash
-exec python3 "$@"' > /home/iml1s/projects/termux-flutter/depot_tools/vpython3
-chmod +x /home/iml1s/projects/termux-flutter/depot_tools/vpython3
+exec python3 "$@"' > depot_tools/vpython3
+chmod +x depot_tools/vpython3
 ```
 
-3. 使用 PowerShell 而非 Git Bash 執行 WSL 命令（避免路徑轉換問題）
+3. Use PowerShell (not Git Bash) for WSL commands to avoid path conversion issues
 
-4. 構建命令需設置乾淨 PATH：
-```bash
-# 從 PowerShell 執行
-powershell -Command "wsl --exec bash -c 'export PATH=/home/iml1s/projects/termux-flutter/depot_tools:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin; cd /home/iml1s/projects/termux-flutter/flutter/engine/src/out/linux_release_arm64 && ninja flutter flutter/shell/platform/linux:flutter_gtk -j24'"
+## Deployment to Termux
+
+**Important**: Use PowerShell for adb push (Git Bash mangles paths):
+
+```powershell
+# Transfer deb to device
+powershell -Command "adb push 'flutter_3.35.0_aarch64.deb' '/data/local/tmp/'"
+
+# Install in Termux
+pkg install x11-repo
+dpkg -i /data/local/tmp/flutter_3.35.0_aarch64.deb
+apt-get install -f
+bash $PREFIX/share/flutter/post_install.sh  # Required for APK builds!
+
+# Test
+source $PREFIX/etc/profile.d/flutter.sh
+flutter doctor -v
 ```
 
-構建命令（在 WSL 中）：
-```bash
-cd /home/iml1s/projects/termux-flutter
-python3 build.py build --arch=arm64 --mode=debug --jobs=24
-python3 build.py build_dart --arch=arm64 --mode=debug --jobs=24
-python3 build.py debuild --arch=arm64
-```
+## Test Device
 
-## 版本資訊
+- Device ID: `R52Y100VWGM`
+- SSH (preferred): `ssh -p 8022 <IP>`
+- ADB: `adb -s R52Y100VWGM shell`
+
+## Version Info
 
 - Flutter: 3.35.0
-- Engine: 對應 Flutter 3.35.0 的 engine commit
-- 目標平台: aarch64 (ARM64)
+- Target: aarch64 (ARM64)
 
-## 當前功能狀態 (2025-12-29 全部驗證通過)
+## Verified Feature Status (2025-12-29)
 
-| 功能 | 狀態 | 需求 |
-|------|------|------|
-| `flutter doctor` | ✅ 已驗證 | 僅需 deb 安裝 |
-| `flutter create` | ✅ 已驗證 | 僅需 deb 安裝 |
-| `flutter build linux --debug` | ✅ 已驗證 | 需要: gtk3, x11-repo |
-| `flutter build linux --release` | ✅ 已驗證 | 需要: gtk3, x11-repo |
-| `flutter build linux --profile` | ✅ 已驗證 | 需要: gtk3, x11-repo |
-| `flutter build apk --release` | ✅ 已驗證 (151MB) | 需要: post_install.sh + 專案配置 compileSdk=34 |
-| `flutter build apk --debug` | ✅ 已驗證 (591MB) | 需要: post_install.sh + vm_isolate_snapshot.bin + 專案配置 |
-| `flutter build apk --profile` | ✅ 已驗證 (165MB) | 需要: post_install.sh + profile gen_snapshot + 專案配置 |
-| `flutter run -d linux --debug` | ✅ 已驗證 | 需要: termux-x11-nightly, DISPLAY=:0 |
-| `flutter run -d linux --release` | ✅ 已驗證 | 需要: termux-x11-nightly, DISPLAY=:0 |
-| APK 安裝運行 | ✅ 已驗證 | 需要: 從 PC 用 `adb install` (Termux 內 pm install 權限不足) |
+| Feature | Status | Requirements |
+|---------|--------|--------------|
+| `flutter doctor` | ✅ | deb install only |
+| `flutter create` | ✅ | deb install only |
+| `flutter build linux` | ✅ | gtk3, x11-repo |
+| `flutter build apk` | ✅ | post_install.sh + project config |
+| `flutter run -d linux` | ✅ | termux-x11-nightly, DISPLAY=:0 |
+| `flutter run` (Hot Reload) | ✅ | post_install.sh |
+| APK install | ✅ | Use `adb install` from PC |
 
-**APK 構建前置條件（安裝 deb 後執行 post_install.sh）：**
-1. 安裝 Android API 34（aapt2 bug workaround）
-2. 修改 FlutterPluginConstants.kt（僅構建 ARM64）
-3. 創建 NDK clang wrapper
-4. 修補 android-legacy.toolchain.cmake
-5. 創建 sysroot 符號連結
-6. 每個專案設置 compileSdk=34, targetSdk=34, ndk.abiFilters=arm64-v8a
+## APK Build Project Configuration
 
-詳見 `BUILD_GUIDE.md` 的「Termux APK 構建完整設置指南」章節。
+Each Flutter project needs in `android/app/build.gradle.kts`:
+```kotlin
+android {
+    compileSdk = 34  // Must use API 34 (aapt2 bug with 35/36)
+    defaultConfig {
+        targetSdk = 34
+        ndk {
+            abiFilters += listOf("arm64-v8a")  // ARM64 only
+        }
+    }
+}
+```
 
-## 更新日誌
+In `android/gradle.properties`:
+```properties
+android.aapt2FromMavenOverride=/data/data/com.termux/files/usr/bin/aapt2
+```
 
-### 2025-12-29 v4
-- ✅ **全部功能測試通過！**
-- ✅ flutter build apk --debug 正常 (需要 vm_isolate_snapshot.bin)
-- ✅ flutter build apk --profile 正常 (需要 profile gen_snapshot)
-- ✅ APK 安裝並運行正常
-- 📝 創建 post_install.sh 自動配置腳本
-- 📝 更新 package.yaml 包含所有必要 artifacts
-- 📝 完整記錄所有 APK 構建配置步驟
+## Upgrading Flutter Version
 
-### 2025-12-29 v3
-- ✅ 完成所有 Linux build 模式測試 (debug/release/profile)
-- ✅ 完成 APK release build 測試
-- 添加 WSL 構建解決方案：Windows PATH 污染問題
-- 添加 vpython3 wrapper 到 depot_tools
-- 文檔化 APK 構建前置條件 (ARM64 NDK, AAPT2 替換)
-
-### 2025-12-29 v2
-- 完成功能測試：flutter doctor ✅, flutter build apk ✅
-- 文檔化 debug/release 模式限制
-- 文檔化 sysroot 衝突問題（glibc vs bionic headers）
-
-### 2025-12-29 v1
-- 修復 TLS segment underaligned 問題（Bionic linker）
-- **重要**：deb 打包時必須使用最新構建的 dart，否則會包含錯誤版本
-- 添加 `termux_ndk_path` 到 configure 方法
-
-### 2025-12-28
-- 修復 `flutter build apk --release` 不再需要 `--target-platform android-arm64`
-- 新增 flutter_gtk 構建支援 `flutter build linux`
-- 更新依賴從 openjdk-17 到 openjdk-21
-- 完善構建文檔
+1. Update `tag` in `build.toml`
+2. Run sync and apply patches:
+```bash
+python3 build.py clone
+python3 build.py sync
+python3 build.py patch_engine  # May need patch updates if fails
+```
+3. Run full build

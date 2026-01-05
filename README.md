@@ -691,6 +691,72 @@ python3 build.py build_android_gen_snapshot --arch=arm64 --mode=release
 
 ---
 
+## 🔧 常見問題排解
+
+### NDK Clang 找不到編譯器
+
+**錯誤訊息**：
+```
+CMake Error: The CMAKE_C_COMPILER is not a full path to an existing compiler tool.
+```
+
+**原因**：Gradle 在構建時下載了新的 NDK 版本，但 `post_install.sh` 在 NDK 下載之前已經運行過，導致 clang wrapper 沒有被創建。
+
+**解決方案**：重新運行 post_install.sh 來配置所有 NDK：
+```bash
+bash $PREFIX/share/flutter/post_install.sh
+flutter build apk --release
+```
+
+### libflutter_linux_gtk.so 找不到
+
+**錯誤訊息**：
+```
+Unsupported file type "notFound" for libflutter_linux_gtk.so
+```
+
+**原因**：deb 包中缺少 Linux GTK 庫。
+
+**解決方案**：這是構建問題，需要重新構建 deb 包並確保 `flutter_gtk` 目標已啟用。如果你是用戶，請下載最新版本的 deb 包。
+
+### DT_RPATH 警告
+
+**警告訊息**：
+```
+WARNING: linker: Warning: unused DT entry: DT_RPATH
+```
+
+**原因**：ELF 二進制文件包含不必要的 DT_RPATH 條目。
+
+**解決方案**：這個警告不影響功能，但可以通過 `termux-elf-cleaner` 清除：
+```bash
+pkg install termux-elf-cleaner
+termux-elf-cleaner $PREFIX/opt/flutter/bin/cache/dart-sdk/bin/dart
+```
+
+### AAPT2 執行失敗 (EM_X86_64)
+
+**錯誤訊息**：
+```
+aapt2: cannot execute: required file not found (or) EM_X86_64
+```
+
+**原因**：Gradle 下載的 aapt2 是 x86_64 版本，無法在 ARM64 上運行。
+
+**解決方案**：
+```bash
+# 方法 1: 在 gradle.properties 中指定 ARM64 aapt2
+echo "android.aapt2FromMavenOverride=$PREFIX/bin/aapt2" >> android/gradle.properties
+
+# 方法 2: 替換 Gradle 緩存中的 aapt2
+find ~/.gradle/caches -name "aapt2" -path "*aapt2-*-linux*" | while read f; do
+    rm -f "$f"
+    ln -s $PREFIX/bin/aapt2 "$f"
+done
+```
+
+---
+
 ## 📋 升級到新版本
 
 1. 修改 `build.toml` 中的 `tag` 為新版本號

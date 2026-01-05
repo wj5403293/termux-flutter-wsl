@@ -61,3 +61,26 @@ node_modules/
 *.a
 *.so.*
 *.dSYM/
+
+# ----- 截圖與臨時測試資源 -----
+*.png
+*.jpg
+*.jpeg
+*.gif
+
+# ----- 大型二進制與壓縮包 -----
+*.zip
+*.tar.gz
+*.tar.xz
+*.bin
+*.7z
+*.rar
+
+# ----- 大型 Flutter 構建產物 -----
+gen_snapshot
+gen_snapshot_profile
+impellerc
+data.tar.xz
+
+# ----- 其他 -----
+nul

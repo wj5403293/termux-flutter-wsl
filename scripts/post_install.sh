@@ -11,11 +11,110 @@ echo "=========================================="
 # 路徑定義
 FLUTTER_ROOT=/data/data/com.termux/files/usr/opt/flutter
 ANDROID_SDK=/data/data/com.termux/files/usr/opt/android-sdk
-NDK=$ANDROID_SDK/ndk/27.0.12077973
-PREBUILT=$NDK/toolchains/llvm/prebuilt
-SYSROOT=$PREBUILT/linux-x86_64/sysroot
-CLANG_LIB=$PREBUILT/linux-x86_64/lib/clang/18/lib/linux
 DART_SDK=$FLUTTER_ROOT/bin/cache/dart-sdk
+
+# Helper function to setup NDK clang wrappers for any NDK version
+setup_ndk_clang_wrappers() {
+    local NDK_PATH="$1"
+    local NDK_NAME=$(basename "$NDK_PATH")
+
+    if [ ! -d "$NDK_PATH/toolchains/llvm" ]; then
+        echo "    ⚠ Skipping $NDK_NAME (no toolchains/llvm directory)"
+        return
+    fi
+
+    local PREBUILT="$NDK_PATH/toolchains/llvm/prebuilt"
+    local SYSROOT="$PREBUILT/linux-x86_64/sysroot"
+    local CLANG_LIB="$PREBUILT/linux-x86_64/lib/clang/18/lib/linux"
+
+    echo "    Setting up clang wrappers for NDK $NDK_NAME..."
+
+    # Create wrapper script content (using NDK_PATH variable in script)
+CLANG_WRAPPER="#!/bin/sh
+NDK=$NDK_PATH
+SYSROOT=\$NDK/toolchains/llvm/prebuilt/linux-x86_64/sysroot
+CLANG_LIB=\$NDK/toolchains/llvm/prebuilt/linux-x86_64/lib/clang/18/lib/linux
+
+ARCH=\"\"
+for arg in \"\$@\"; do
+    case \"\$arg\" in
+        --target=aarch64*) ARCH=\"aarch64\" ;;
+        --target=arm*) ARCH=\"arm\" ;;
+    esac
+done
+
+if [ \"\$ARCH\" = \"aarch64\" ]; then
+    LIB_PATH=\$SYSROOT/usr/lib/aarch64-linux-android
+    CLANG_LIB_ARCH=\$CLANG_LIB/aarch64
+elif [ \"\$ARCH\" = \"arm\" ]; then
+    LIB_PATH=\$SYSROOT/usr/lib/arm-linux-androideabi
+    CLANG_LIB_ARCH=\$CLANG_LIB/arm
+else
+    exec /data/data/com.termux/files/usr/bin/clang \"\$@\"
+fi
+
+exec /data/data/com.termux/files/usr/bin/clang -L\$LIB_PATH -L\$CLANG_LIB_ARCH \"\$@\""
+
+CLANGPP_WRAPPER="#!/bin/sh
+NDK=$NDK_PATH
+SYSROOT=\$NDK/toolchains/llvm/prebuilt/linux-x86_64/sysroot
+CLANG_LIB=\$NDK/toolchains/llvm/prebuilt/linux-x86_64/lib/clang/18/lib/linux
+
+ARCH=\"\"
+for arg in \"\$@\"; do
+    case \"\$arg\" in
+        --target=aarch64*) ARCH=\"aarch64\" ;;
+        --target=arm*) ARCH=\"arm\" ;;
+    esac
+done
+
+if [ \"\$ARCH\" = \"aarch64\" ]; then
+    LIB_PATH=\$SYSROOT/usr/lib/aarch64-linux-android
+    CLANG_LIB_ARCH=\$CLANG_LIB/aarch64
+elif [ \"\$ARCH\" = \"arm\" ]; then
+    LIB_PATH=\$SYSROOT/usr/lib/arm-linux-androideabi
+    CLANG_LIB_ARCH=\$CLANG_LIB/arm
+else
+    exec /data/data/com.termux/files/usr/bin/clang++ \"\$@\"
+fi
+
+exec /data/data/com.termux/files/usr/bin/clang++ -L\$LIB_PATH -L\$CLANG_LIB_ARCH \"\$@\""
+
+    # Create wrappers in prebuilt/bin/ (for some toolchain configs)
+    mkdir -p "$PREBUILT/bin"
+    echo "$CLANG_WRAPPER" > "$PREBUILT/bin/clang"
+    chmod +x "$PREBUILT/bin/clang"
+    echo "$CLANGPP_WRAPPER" > "$PREBUILT/bin/clang++"
+    chmod +x "$PREBUILT/bin/clang++"
+
+    # Create wrappers in prebuilt/linux-x86_64/bin/ (official NDK structure)
+    mkdir -p "$PREBUILT/linux-x86_64/bin"
+    if [ -f "$PREBUILT/linux-x86_64/bin/clang" ] && [ ! -L "$PREBUILT/linux-x86_64/bin/clang" ]; then
+        # Backup original x86_64 binaries
+        mv "$PREBUILT/linux-x86_64/bin/clang" "$PREBUILT/linux-x86_64/bin/clang.x86_64.bak" 2>/dev/null || true
+        mv "$PREBUILT/linux-x86_64/bin/clang++" "$PREBUILT/linux-x86_64/bin/clang++.x86_64.bak" 2>/dev/null || true
+    fi
+    echo "$CLANG_WRAPPER" > "$PREBUILT/linux-x86_64/bin/clang"
+    chmod +x "$PREBUILT/linux-x86_64/bin/clang"
+    echo "$CLANGPP_WRAPPER" > "$PREBUILT/linux-x86_64/bin/clang++"
+    chmod +x "$PREBUILT/linux-x86_64/bin/clang++"
+
+    # Create linux-aarch64 symlink (for some toolchain configs)
+    ln -sf bin "$PREBUILT/linux-aarch64" 2>/dev/null || true
+
+    # Create sysroot symlink
+    ln -sf linux-x86_64/sysroot "$PREBUILT/sysroot" 2>/dev/null || true
+
+    # Patch toolchain cmake if exists
+    local TOOLCHAIN="$NDK_PATH/build/cmake/android-legacy.toolchain.cmake"
+    if [ -f "$TOOLCHAIN" ]; then
+        if grep -q 'list(APPEND ANDROID_LINKER_FLAGS "-static-libstdc++")' "$TOOLCHAIN" 2>/dev/null; then
+            sed -i 's/list(APPEND ANDROID_LINKER_FLAGS "-static-libstdc++")/# Disabled for Termux: list(APPEND ANDROID_LINKER_FLAGS "-static-libstdc++")/' "$TOOLCHAIN"
+        fi
+    fi
+
+    echo "    ✓ NDK $NDK_NAME configured"
+}
 
 # Get engine version for downloads
 ENGINE_VERSION=$(cat $FLUTTER_ROOT/bin/internal/engine.version 2>/dev/null || echo "1e9a811bf8e70466596bcf0ea3a8b5adb5f17f7f")
@@ -112,96 +211,28 @@ object FlutterPluginConstants {
 EOF
 echo "  ✓ FlutterPluginConstants.kt updated"
 
-# 3. 創建 NDK clang wrapper
+# 3. 創建 NDK clang wrappers (處理所有已安裝的 NDK 版本)
 echo "[4/13] Creating NDK clang wrappers..."
-mkdir -p $PREBUILT/bin
 
-cat > $PREBUILT/bin/clang << 'EOF'
-#!/bin/sh
-NDK=/data/data/com.termux/files/usr/opt/android-sdk/ndk/27.0.12077973
-SYSROOT=$NDK/toolchains/llvm/prebuilt/linux-x86_64/sysroot
-CLANG_LIB=$NDK/toolchains/llvm/prebuilt/linux-x86_64/lib/clang/18/lib/linux
-
-ARCH=""
-for arg in "$@"; do
-    case "$arg" in
-        --target=aarch64*) ARCH="aarch64" ;;
-        --target=arm*) ARCH="arm" ;;
-    esac
-done
-
-if [ "$ARCH" = "aarch64" ]; then
-    LIB_PATH=$SYSROOT/usr/lib/aarch64-linux-android
-    CLANG_LIB_ARCH=$CLANG_LIB/aarch64
-elif [ "$ARCH" = "arm" ]; then
-    LIB_PATH=$SYSROOT/usr/lib/arm-linux-androideabi
-    CLANG_LIB_ARCH=$CLANG_LIB/arm
+NDK_DIR="$ANDROID_SDK/ndk"
+if [ -d "$NDK_DIR" ]; then
+    NDK_COUNT=0
+    for ndk_path in "$NDK_DIR"/*; do
+        if [ -d "$ndk_path" ]; then
+            setup_ndk_clang_wrappers "$ndk_path"
+            NDK_COUNT=$((NDK_COUNT + 1))
+        fi
+    done
+    if [ $NDK_COUNT -eq 0 ]; then
+        echo "  ⚠ No NDK found. Clang wrappers will be created when NDK is installed."
+        echo "    Re-run this script after installing NDK: bash $PREFIX/share/flutter/post_install.sh"
+    else
+        echo "  ✓ $NDK_COUNT NDK(s) configured"
+    fi
 else
-    exec /data/data/com.termux/files/usr/bin/clang "$@"
+    echo "  ⚠ NDK directory not found. Clang wrappers will be created when NDK is installed."
+    echo "    Re-run this script after installing NDK: bash $PREFIX/share/flutter/post_install.sh"
 fi
-
-exec /data/data/com.termux/files/usr/bin/clang -L$LIB_PATH -L$CLANG_LIB_ARCH "$@"
-EOF
-chmod +x $PREBUILT/bin/clang
-
-cat > $PREBUILT/bin/clang++ << 'EOF'
-#!/bin/sh
-NDK=/data/data/com.termux/files/usr/opt/android-sdk/ndk/27.0.12077973
-SYSROOT=$NDK/toolchains/llvm/prebuilt/linux-x86_64/sysroot
-CLANG_LIB=$NDK/toolchains/llvm/prebuilt/linux-x86_64/lib/clang/18/lib/linux
-
-ARCH=""
-for arg in "$@"; do
-    case "$arg" in
-        --target=aarch64*) ARCH="aarch64" ;;
-        --target=arm*) ARCH="arm" ;;
-    esac
-done
-
-if [ "$ARCH" = "aarch64" ]; then
-    LIB_PATH=$SYSROOT/usr/lib/aarch64-linux-android
-    CLANG_LIB_ARCH=$CLANG_LIB/aarch64
-elif [ "$ARCH" = "arm" ]; then
-    LIB_PATH=$SYSROOT/usr/lib/arm-linux-androideabi
-    CLANG_LIB_ARCH=$CLANG_LIB/arm
-else
-    exec /data/data/com.termux/files/usr/bin/clang++ "$@"
-fi
-
-exec /data/data/com.termux/files/usr/bin/clang++ -L$LIB_PATH -L$CLANG_LIB_ARCH "$@"
-EOF
-chmod +x $PREBUILT/bin/clang++
-echo "  ✓ clang wrappers created"
-
-# 4. 修補 NDK toolchain cmake
-echo "[5/13] Patching NDK toolchain cmake..."
-TOOLCHAIN=$NDK/build/cmake/android-legacy.toolchain.cmake
-if grep -q 'list(APPEND ANDROID_LINKER_FLAGS "-static-libstdc++")' $TOOLCHAIN 2>/dev/null; then
-    sed -i 's/list(APPEND ANDROID_LINKER_FLAGS "-static-libstdc++")/# Disabled for Termux: list(APPEND ANDROID_LINKER_FLAGS "-static-libstdc++")/' $TOOLCHAIN
-    echo "  ✓ Toolchain patched"
-else
-    echo "  ✓ Toolchain already patched or not found"
-fi
-
-# 5. 創建 sysroot 符號連結
-echo "[6/13] Creating sysroot symlinks..."
-ln -sf linux-x86_64/sysroot $PREBUILT/sysroot 2>/dev/null || true
-ln -sf 18 $PREBUILT/linux-x86_64/lib/clang/21 2>/dev/null || true
-
-SYSROOT_LIB=$SYSROOT/usr/lib
-ln -sf aarch64-linux-android $SYSROOT_LIB/aarch64-none-linux-android 2>/dev/null || true
-ln -sf aarch64-linux-android/24 $SYSROOT_LIB/aarch64-none-linux-android24 2>/dev/null || true
-echo "  ✓ Sysroot symlinks created"
-
-# 6. 複製運行時庫
-echo "[7/13] Copying runtime libraries..."
-for f in libunwind.a libatomic.a; do
-    ln -sf $CLANG_LIB/aarch64/$f $SYSROOT_LIB/aarch64-linux-android/$f 2>/dev/null || true
-    ln -sf $CLANG_LIB/aarch64/$f $SYSROOT_LIB/aarch64-linux-android/24/$f 2>/dev/null || true
-    ln -sf $CLANG_LIB/arm/$f $SYSROOT_LIB/arm-linux-androideabi/$f 2>/dev/null || true
-    ln -sf $CLANG_LIB/arm/$f $SYSROOT_LIB/arm-linux-androideabi/24/$f 2>/dev/null || true
-done
-echo "  ✓ Runtime libraries linked"
 
 # 7. 創建 build-tools 符號連結
 echo "[8/13] Creating build-tools symlinks..."
