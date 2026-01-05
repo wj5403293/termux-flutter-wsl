@@ -4,7 +4,7 @@
 # Complete Flutter + Android SDK Installation for Termux
 #
 # Usage: curl -sL https://raw.githubusercontent.com/ImL1s/termux-flutter-wsl/master/install_flutter_complete.sh -o ~/install.sh && bash ~/install.sh
-# Version: 2026-01-05 v5
+# Version: 2026-01-06 v6
 #
 # 這個腳本會自動完成：
 #   1. 安裝 Flutter SDK
@@ -104,7 +104,7 @@ pkg install -y x11-repo
 pkg install -y openjdk-21 git wget curl unzip cmake ninja
 
 # 下載 Flutter deb
-FLUTTER_DEB_URL="https://github.com/ImL1s/termux-flutter-wsl/releases/download/v${FLUTTER_VERSION}/flutter_${FLUTTER_VERSION}_aarch64.deb"
+FLUTTER_DEB_URL="https://github.com/ImL1s/termux-flutter-wsl/releases/download/${FLUTTER_VERSION}/flutter_${FLUTTER_VERSION}_aarch64.deb"
 FLUTTER_DEB="$HOME/flutter_${FLUTTER_VERSION}_aarch64.deb"
 
 if [ ! -f "$FLUTTER_DEB" ]; then
@@ -130,6 +130,38 @@ if [ -f "$DART_SDK/bin/dart" ] && [ -f "$FLUTTER_ROOT/packages/flutter_tools/bin
 fi
 
 echo "  ✓ Flutter 已安裝"
+
+# 下載官方 Dart SDK snapshots（用於 hot reload / flutter run）
+echo "下載 Dart SDK snapshots..."
+ENGINE_VERSION=$(cat $FLUTTER_ROOT/bin/internal/engine.version 2>/dev/null || echo "")
+SNAPSHOTS_DIR=$DART_SDK/bin/snapshots
+if [ -n "$ENGINE_VERSION" ] && [ ! -f "$SNAPSHOTS_DIR/dds_aot.dart.snapshot" ]; then
+    SNAPSHOTS_URL="https://storage.googleapis.com/flutter_infra_release/flutter/${ENGINE_VERSION}/dart-sdk-linux-arm64.zip"
+    echo "  從官方 Flutter 儲存下載 snapshots..."
+    wget -q --show-progress "$SNAPSHOTS_URL" -O "$HOME/dart-sdk.zip" || true
+    if [ -f "$HOME/dart-sdk.zip" ]; then
+        unzip -o -j "$HOME/dart-sdk.zip" 'dart-sdk/bin/snapshots/*' -d "$SNAPSHOTS_DIR" 2>/dev/null || true
+        rm -f "$HOME/dart-sdk.zip"
+        echo "  ✓ Dart SDK snapshots 已安裝"
+    fi
+else
+    echo "  ✓ Dart SDK snapshots 已存在或無需更新"
+fi
+
+# 清理 ELF 二進制文件（移除 DT_RPATH 警告，修復 flutter run JSON 解析問題）
+echo "清理 ELF binaries..."
+apt download termux-elf-cleaner 2>/dev/null || true
+if ls termux-elf-cleaner*.deb 1>/dev/null 2>&1; then
+    dpkg -i termux-elf-cleaner*.deb 2>/dev/null || true
+    rm -f termux-elf-cleaner*.deb
+fi
+if command -v termux-elf-cleaner &> /dev/null; then
+    termux-elf-cleaner "$DART_SDK/bin/dart" 2>/dev/null || true
+    termux-elf-cleaner "$DART_SDK/bin/dartaotruntime" 2>/dev/null || true
+    echo "  ✓ ELF binaries 已清理"
+else
+    echo "  ⚠ termux-elf-cleaner 未安裝"
+fi
 
 # ========================================
 # Step 3: 安裝 Android SDK
@@ -382,13 +414,32 @@ if grep -q "CMAKE_C_COMPILER" /tmp/build1.log 2>/dev/null || grep -q "compiler i
     flutter build apk --release --target-platform android-arm64 2>&1 | tee /tmp/build2.log || true
 fi
 
-# 檢查結果
+# 檢查 APK 結果
 if [ -f "build/app/outputs/flutter-apk/app-release.apk" ]; then
     APK_SIZE=$(ls -lh build/app/outputs/flutter-apk/app-release.apk | awk '{print $5}')
-    BUILD_SUCCESS=true
+    APK_BUILD_SUCCESS=true
+    echo "  ✓ APK 構建成功 ($APK_SIZE)"
 else
-    BUILD_SUCCESS=false
+    APK_BUILD_SUCCESS=false
+    echo "  ✗ APK 構建失敗"
 fi
+
+# 測試 Linux 構建（如果已安裝 gtk3）
+LINUX_BUILD_SUCCESS=false
+if command -v pkg-config &> /dev/null && pkg-config --exists gtk+-3.0 2>/dev/null; then
+    echo "構建 Linux 應用（需要 gtk3）..."
+    flutter build linux 2>&1 | tail -5 || true
+    if [ -f "build/linux/arm64/release/bundle/flutter_test_app" ]; then
+        LINUX_BUILD_SUCCESS=true
+        echo "  ✓ Linux 構建成功"
+    else
+        echo "  ⚠ Linux 構建跳過（可安裝 gtk3 啟用）"
+    fi
+else
+    echo "  ⚠ Linux 構建跳過（需要 pkg install gtk3）"
+fi
+
+BUILD_SUCCESS=$APK_BUILD_SUCCESS
 
 cd $HOME
 
