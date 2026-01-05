@@ -4,7 +4,7 @@
 # Complete Flutter + Android SDK Installation for Termux
 #
 # Usage: curl -sL https://raw.githubusercontent.com/ImL1s/termux-flutter-wsl/master/install_flutter_complete.sh -o ~/install.sh && bash ~/install.sh
-# Version: 2026-01-06 v11
+# Version: 2026-01-06 v12
 #
 # 這個腳本會自動完成：
 #   1. 安裝 Flutter SDK
@@ -107,7 +107,13 @@ echo -e "${GREEN}[2/${TOTAL_STEPS}]${NC} 安裝 Flutter SDK..."
 
 # 安裝依賴
 pkg install -y x11-repo
+# 安裝基本工具
 pkg install -y openjdk-21 git wget curl unzip cmake ninja binutils
+
+# 安裝 Android build tools（需要繞過 android-sdk 依賴問題）
+for pkg in d8 dx aidl apksigner googletest; do
+    apt download $pkg 2>/dev/null && dpkg -i ${pkg}*.deb 2>/dev/null && rm -f ${pkg}*.deb
+done
 
 # 下載 Flutter deb
 FLUTTER_DEB_URL="https://github.com/ImL1s/termux-flutter-wsl/releases/download/${FLUTTER_VERSION}/flutter_${FLUTTER_VERSION}_aarch64.deb"
@@ -228,46 +234,36 @@ configure_ndk_clang() {
         return
     fi
 
-    local SYSROOT_LIB="$PREBUILT/linux-x86_64/sysroot/usr/lib/aarch64-linux-android"
-    local CLANG_LIB="$PREBUILT/linux-x86_64/lib/clang/18/lib/linux/aarch64"
-
-    echo "  配置 NDK clang wrapper: $(basename $NDK_DIR)"
+    echo "  配置 NDK: $(basename $NDK_DIR)"
 
     # 創建 sysroot symlink
     ln -sf linux-x86_64/sysroot "$PREBUILT/sysroot" 2>/dev/null || true
 
-    # 創建 bin 目錄
+    # 創建 bin 目錄 symlinks
     mkdir -p "$PREBUILT/bin"
+    ln -sf "$PREBUILT/linux-x86_64/bin/clang" "$PREBUILT/bin/clang" 2>/dev/null || true
+    ln -sf "$PREBUILT/linux-x86_64/bin/clang++" "$PREBUILT/bin/clang++" 2>/dev/null || true
 
-    # 創建 clang wrapper（使用 Termux 的 clang，添加必要的 rtlib 參數）
-    # 重要：必須先刪除 symlinks，因為 clang++ -> clang -> clang-18
-    # 如果不刪除，寫入會修改同一個目標文件
-    rm -f "$PREBUILT/linux-x86_64/bin/clang" "$PREBUILT/linux-x86_64/bin/clang++" 2>/dev/null || true
-
-    # 使用 printf 寫入 wrapper（比 echo 更可靠）
-    printf '#!/data/data/com.termux/files/usr/bin/bash\nexec /data/data/com.termux/files/usr/bin/clang --rtlib=compiler-rt --unwindlib=none "$@"\n' > "$PREBUILT/linux-x86_64/bin/clang"
-    chmod +x "$PREBUILT/linux-x86_64/bin/clang"
-
-    printf '#!/data/data/com.termux/files/usr/bin/bash\nexec /data/data/com.termux/files/usr/bin/clang++ --rtlib=compiler-rt --unwindlib=none "$@"\n' > "$PREBUILT/linux-x86_64/bin/clang++"
-    chmod +x "$PREBUILT/linux-x86_64/bin/clang++"
-
-    # 創建 bin symlinks
-    ln -sf "$PREBUILT/linux-x86_64/bin/clang" "$PREBUILT/bin/clang"
-    ln -sf "$PREBUILT/linux-x86_64/bin/clang++" "$PREBUILT/bin/clang++"
-
-    # 創建 libc++_shared.so 符號連結（某些 cmake 構建需要）
-    local LIB_DIR="$PREBUILT/linux-x86_64/sysroot/usr/lib/aarch64-linux-android"
-    if [ -f "$LIB_DIR/libc++.so" ] && [ ! -f "$LIB_DIR/libc++_shared.so" ]; then
-        ln -sf libc++.so "$LIB_DIR/libc++_shared.so" 2>/dev/null || true
+    # 確保 clang++ 指向 clang-18（可能被之前的腳本修改過）
+    if [ -L "$PREBUILT/linux-x86_64/bin/clang++" ]; then
+        local target=$(readlink "$PREBUILT/linux-x86_64/bin/clang++")
+        if [ "$target" = "clang++" ]; then
+            # 修復循環 symlink
+            rm -f "$PREBUILT/linux-x86_64/bin/clang++"
+            ln -sf clang-18 "$PREBUILT/linux-x86_64/bin/clang++"
+        fi
     fi
 
-    # 為每個 API level 創建 libatomic 和 libc++_shared 符號連結
+    local LIB_DIR="$PREBUILT/linux-x86_64/sysroot/usr/lib/aarch64-linux-android"
+
+    # 為每個 API level 創建正確的符號連結
+    # 重要：libc++_shared.so 必須指向父目錄的真實庫文件，而不是 linker script
     for api_dir in "$LIB_DIR"/*; do
         if [ -d "$api_dir" ]; then
-            # libc++_shared.so
-            if [ -f "$api_dir/libc++.so" ] && [ ! -f "$api_dir/libc++_shared.so" ]; then
-                ln -sf libc++.so "$api_dir/libc++_shared.so" 2>/dev/null || true
-            fi
+            # libc++_shared.so - 指向父目錄的真實庫文件
+            rm -f "$api_dir/libc++_shared.so" 2>/dev/null || true
+            ln -sf ../libc++_shared.so "$api_dir/libc++_shared.so" 2>/dev/null || true
+
             # libatomic.a - 創建空的 stub（Android 不需要 libatomic）
             if [ ! -f "$api_dir/libatomic.a" ]; then
                 ar rcs "$api_dir/libatomic.a" 2>/dev/null || true
