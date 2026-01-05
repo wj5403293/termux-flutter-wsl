@@ -4,7 +4,7 @@
 # Complete Flutter + Android SDK Installation for Termux
 #
 # Usage: curl -sL https://raw.githubusercontent.com/ImL1s/termux-flutter-wsl/master/install_flutter_complete.sh -o ~/install.sh && bash ~/install.sh
-# Version: 2026-01-06 v8
+# Version: 2026-01-06 v9
 #
 # 這個腳本會自動完成：
 #   1. 安裝 Flutter SDK
@@ -249,9 +249,33 @@ configure_ndk_clang() {
     ln -sf "$PREBUILT/linux-x86_64/bin/clang" "$PREBUILT/bin/clang"
     ln -sf "$PREBUILT/linux-x86_64/bin/clang++" "$PREBUILT/bin/clang++"
 
-    # 創建 libc++_shared.a（某些構建需要靜態版本）
-    if [ -f "$SYSROOT_LIB/libc++_static.a" ] && [ ! -f "$PREFIX/lib/libc++_shared.a" ]; then
-        cp "$SYSROOT_LIB/libc++_static.a" "$PREFIX/lib/libc++_shared.a" 2>/dev/null || true
+    # 創建 libc++_shared.so 符號連結（某些 cmake 構建需要）
+    local LIB_DIR="$PREBUILT/linux-x86_64/sysroot/usr/lib/aarch64-linux-android"
+    if [ -f "$LIB_DIR/libc++.so" ] && [ ! -f "$LIB_DIR/libc++_shared.so" ]; then
+        ln -sf libc++.so "$LIB_DIR/libc++_shared.so" 2>/dev/null || true
+    fi
+
+    # 為每個 API level 創建 libatomic 和 libc++_shared 符號連結
+    for api_dir in "$LIB_DIR"/*; do
+        if [ -d "$api_dir" ]; then
+            # libc++_shared.so
+            if [ -f "$api_dir/libc++.so" ] && [ ! -f "$api_dir/libc++_shared.so" ]; then
+                ln -sf libc++.so "$api_dir/libc++_shared.so" 2>/dev/null || true
+            fi
+            # libatomic.a - 創建空的 stub（Android 不需要 libatomic）
+            if [ ! -f "$api_dir/libatomic.a" ]; then
+                ar rcs "$api_dir/libatomic.a" 2>/dev/null || true
+            fi
+        fi
+    done
+
+    # Patch android-legacy.toolchain.cmake（移除 -static-libstdc++ 避免連結錯誤）
+    local TOOLCHAIN="$NDK_DIR/build/cmake/android-legacy.toolchain.cmake"
+    if [ -f "$TOOLCHAIN" ]; then
+        if grep -q 'list(APPEND ANDROID_LINKER_FLAGS "-static-libstdc++")' "$TOOLCHAIN" 2>/dev/null; then
+            sed -i 's/list(APPEND ANDROID_LINKER_FLAGS "-static-libstdc++")/# Disabled for Termux: list(APPEND ANDROID_LINKER_FLAGS "-static-libstdc++")/' "$TOOLCHAIN"
+            echo "    ✓ Patched android-legacy.toolchain.cmake"
+        fi
     fi
 }
 
