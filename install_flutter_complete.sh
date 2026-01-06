@@ -4,7 +4,7 @@
 # Complete Flutter + Android SDK Installation for Termux
 #
 # Usage: curl -sL https://raw.githubusercontent.com/ImL1s/termux-flutter-wsl/master/install_flutter_complete.sh -o ~/install.sh && bash ~/install.sh
-# Version: 2026-01-06 v13
+# Version: 2026-01-06 v14
 #
 # 這個腳本會自動完成：
 #   1. 安裝 Flutter SDK
@@ -455,6 +455,12 @@ GRADLE
 # 構建 APK
 echo "構建 APK（這可能需要幾分鐘）..."
 flutter build apk --release --target-platform android-arm64 2>&1 | tee /tmp/build1.log || true
+
+# Gradle 可能下載了新的 SDK 組件（如 build-tools/35.0.0-2），重新配置
+echo "配置 Gradle 下載的 SDK 組件..."
+if [ -f "$PREFIX/share/flutter/post_install.sh" ]; then
+    bash $PREFIX/share/flutter/post_install.sh 2>/dev/null || true
+fi
 
 # 檢查是否因 NDK clang 問題失敗（Gradle 可能下載了新 NDK）
 if grep -q "CMAKE_C_COMPILER" /tmp/build1.log 2>/dev/null || grep -q "compiler identification is unknown" /tmp/build1.log 2>/dev/null; then

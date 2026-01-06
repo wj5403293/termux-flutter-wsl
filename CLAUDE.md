@@ -214,8 +214,40 @@ flutter doctor -v
 | `flutter build apk --profile` | ✅ | post_install.sh + project config |
 | `flutter build apk --release` | ✅ | post_install.sh + project config |
 | `flutter run -d linux` | ✅ | termux-x11-nightly, DISPLAY=:0 |
-| `flutter run` (Hot Reload) | ✅ | post_install.sh |
+| `flutter run --debug` | ✅ | Wireless debugging enabled |
+| `flutter run --profile` | ✅ | Wireless debugging enabled |
+| `flutter run --release` | ✅ | Wireless debugging enabled |
+| Hot Reload (r) | ✅ | During `flutter run --debug` |
+| Hot Restart (R) | ✅ | During `flutter run --debug` |
+| DevTools | ✅ | During `flutter run` |
 | APK install | ✅ | Use `adb install` from PC |
+
+## Flutter Run on Android (Wireless Debugging)
+
+To use `flutter run` on Termux:
+
+1. Enable Wireless Debugging on your device:
+   - Settings → Developer Options → Wireless Debugging → ON
+
+2. Pair device (one-time):
+   ```bash
+   adb pair 127.0.0.1:<PAIR_PORT> <PAIRING_CODE>
+   ```
+
+3. Connect:
+   ```bash
+   adb connect 127.0.0.1:<CONNECT_PORT>
+   ```
+
+4. Run:
+   ```bash
+   flutter run -d <device_id>
+   ```
+
+**Note:** If Gradle downloads new SDK components, re-run `post_install.sh`:
+```bash
+bash $PREFIX/share/flutter/post_install.sh
+```
 
 ## APK Build Project Configuration
 
