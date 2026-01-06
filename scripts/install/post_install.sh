@@ -231,43 +231,60 @@ else
     echo "    Re-run this script after installing NDK: bash $PREFIX/share/flutter/post_install.sh"
 fi
 
-# 7. 創建 build-tools 符號連結
-echo "[8/13] Creating build-tools symlinks..."
-BUILD_TOOLS=$ANDROID_SDK/build-tools/35.0.0
-mkdir -p $BUILD_TOOLS/lib
+# Helper function to setup build-tools symlinks for any version
+setup_build_tools_symlinks() {
+    local BUILD_TOOLS="$1"
+    local BT_NAME=$(basename "$BUILD_TOOLS")
 
-# 基本工具
-for tool in aapt aapt2 apksigner d8 dx zipalign; do
-    ln -sf /data/data/com.termux/files/usr/bin/$tool $BUILD_TOOLS/$tool 2>/dev/null || true
-done
+    mkdir -p "$BUILD_TOOLS/lib"
 
-# aidl
-ln -sf /data/data/com.termux/files/usr/bin/aidl $BUILD_TOOLS/aidl 2>/dev/null || true
+    # Basic tools
+    for tool in aapt aapt2 apksigner d8 dx zipalign aidl; do
+        ln -sf /data/data/com.termux/files/usr/bin/$tool "$BUILD_TOOLS/$tool" 2>/dev/null || true
+    done
 
-# dexdump (from ART)
-if [ -f /apex/com.android.art/bin/dexdump ]; then
-    ln -sf /apex/com.android.art/bin/dexdump $BUILD_TOOLS/dexdump 2>/dev/null || true
-fi
+    # dexdump (from ART)
+    if [ -f /apex/com.android.art/bin/dexdump ]; then
+        ln -sf /apex/com.android.art/bin/dexdump "$BUILD_TOOLS/dexdump" 2>/dev/null || true
+    fi
 
-# split-select stub
-cat > $BUILD_TOOLS/split-select << 'EOF'
+    # split-select stub
+    cat > "$BUILD_TOOLS/split-select" << 'SPLITEOF'
 #!/bin/sh
 echo "split-select is not available on Termux ARM64"
 exit 0
-EOF
-chmod +x $BUILD_TOOLS/split-select
+SPLITEOF
+    chmod +x "$BUILD_TOOLS/split-select"
 
-# core-lambda-stubs.jar
-if [ ! -f $BUILD_TOOLS/core-lambda-stubs.jar ]; then
-    MANIFEST_TMP="${TMPDIR:-$PREFIX/tmp}/MANIFEST.MF"
-    echo "Manifest-Version: 1.0" > "$MANIFEST_TMP"
-    jar cfm $BUILD_TOOLS/core-lambda-stubs.jar "$MANIFEST_TMP"
-    rm "$MANIFEST_TMP"
-fi
+    # core-lambda-stubs.jar
+    if [ ! -f "$BUILD_TOOLS/core-lambda-stubs.jar" ]; then
+        MANIFEST_TMP="${TMPDIR:-$PREFIX/tmp}/MANIFEST.MF"
+        echo "Manifest-Version: 1.0" > "$MANIFEST_TMP"
+        jar cfm "$BUILD_TOOLS/core-lambda-stubs.jar" "$MANIFEST_TMP" 2>/dev/null || true
+        rm -f "$MANIFEST_TMP"
+    fi
 
-# d8.jar and dx.jar
-ln -sf /data/data/com.termux/files/usr/share/java/d8.jar $BUILD_TOOLS/lib/d8.jar 2>/dev/null || true
-ln -sf /data/data/com.termux/files/usr/share/java/d8.jar $BUILD_TOOLS/lib/dx.jar 2>/dev/null || true
+    # d8.jar and dx.jar
+    ln -sf /data/data/com.termux/files/usr/share/java/d8.jar "$BUILD_TOOLS/lib/d8.jar" 2>/dev/null || true
+    ln -sf /data/data/com.termux/files/usr/share/java/d8.jar "$BUILD_TOOLS/lib/dx.jar" 2>/dev/null || true
+
+    echo "    ✓ build-tools $BT_NAME configured"
+}
+
+# 7. 創建 build-tools 符號連結 (for all versions)
+echo "[8/13] Creating build-tools symlinks..."
+BT_DIR=$ANDROID_SDK/build-tools
+mkdir -p "$BT_DIR"
+
+# Setup default version first
+setup_build_tools_symlinks "$BT_DIR/35.0.0"
+
+# Also setup any other versions Gradle may have downloaded
+for bt_path in "$BT_DIR"/*; do
+    if [ -d "$bt_path" ] && [ "$(basename "$bt_path")" != "35.0.0" ]; then
+        setup_build_tools_symlinks "$bt_path"
+    fi
+done
 
 echo "  ✓ Build-tools symlinks created"
 
@@ -286,10 +303,13 @@ else
 fi
 
 # 9. 創建 platform-tools 符號連結 (adb)
+# Note: Gradle may download x86_64 platform-tools, so we force overwrite
 echo "[10/13] Creating platform-tools symlinks..."
 mkdir -p $ANDROID_SDK/platform-tools
-ln -sf /data/data/com.termux/files/usr/bin/adb $ANDROID_SDK/platform-tools/adb 2>/dev/null || true
-ln -sf /data/data/com.termux/files/usr/bin/fastboot $ANDROID_SDK/platform-tools/fastboot 2>/dev/null || true
+# Remove any x86_64 binaries Gradle may have downloaded
+rm -f $ANDROID_SDK/platform-tools/adb $ANDROID_SDK/platform-tools/fastboot 2>/dev/null || true
+ln -sf /data/data/com.termux/files/usr/bin/adb $ANDROID_SDK/platform-tools/adb
+ln -sf /data/data/com.termux/files/usr/bin/fastboot $ANDROID_SDK/platform-tools/fastboot
 echo "  ✓ platform-tools symlinks created"
 
 # 10. 接受 Android licenses
