@@ -214,7 +214,7 @@ resource:
   # Android gen_snapshot for profile mode (flutter build apk --profile)
   android_gen_snapshot_arm64_profile:
     source:
-      - $android_profile_out/gen_snapshot
+      - $android_profile_out/clang_arm64/gen_snapshot
     output:
       - $eng/android-arm64-profile/linux-$arch
     define:

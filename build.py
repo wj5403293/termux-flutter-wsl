@@ -516,15 +516,20 @@ class Build:
         # Due to Dart VM cross-compilation limitations, we can only build
         # gen_snapshot for android-arm64. android-arm and android-x64 require
         # patching the Dart VM signal handler code.
-        logger.info('[5/7] Building Android gen_snapshot (arm64 only)...')
+        logger.info('[5/8] Building Android gen_snapshot release (arm64 only)...')
         self.configure_android(arch='arm64', mode='release')
         self.build_android_gen_snapshot(arch='arm64', mode='release', jobs=jobs)
 
-        # Step 6: Package deb
-        logger.info('[6/7] Packaging deb...')
+        # Step 6: Build Android gen_snapshot profile mode
+        logger.info('[6/8] Building Android gen_snapshot profile (arm64 only)...')
+        self.configure_android(arch='arm64', mode='profile')
+        self.build_android_gen_snapshot(arch='arm64', mode='profile', jobs=jobs)
+
+        # Step 7: Package deb
+        logger.info('[7/8] Packaging deb...')
         self.debuild(arch=arch, output=self.output(arch))
 
-        logger.info('[7/7] Build complete!')
+        logger.info('[8/8] Build complete!')
         logger.info(f'Output: {self.output(arch)}')
         logger.info('Note: Users must use --target-platform android-arm64 when building APKs')
 
