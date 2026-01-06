@@ -42,9 +42,33 @@ python3 build.py debuild --arch=arm64
 | `sysroot.py` | Termux sysroot assembly from apt packages |
 | `package.py` | Deb packaging logic |
 | `utils.py` | Build utilities and path helpers |
-| `patches/*.patch` | Engine/Dart/Skia patches for Termux compatibility |
-| `scripts/post_install.sh` | Post-installation setup for APK builds |
+| `patches/{version}/*.patch` | Version-specific Engine/Dart/Skia patches |
+| `scripts/install/post_install.sh` | Post-installation setup for APK builds |
+| `install_flutter_complete.sh` | One-command Termux installation script |
+| `CHANGELOG.md` | Version history and release notes |
 | `BUILD_GUIDE.md` | Detailed build guide and troubleshooting |
+
+## Project Structure
+
+```
+flutter_termux/
+├── build.py                    # Main build script
+├── build.toml                  # Build configuration
+├── install_flutter_complete.sh # Termux installation script
+├── patches/
+│   └── 3.35.0/                 # Version-specific patches
+│       ├── engine.patch
+│       ├── dart.patch
+│       └── skia.patch
+├── scripts/
+│   ├── build/                  # Build helper scripts
+│   ├── setup/                  # Environment setup scripts
+│   ├── install/                # Installation scripts
+│   │   └── post_install.sh
+│   ├── fix/                    # Fix/workaround scripts
+│   └── test/                   # Test scripts
+└── .github/workflows/          # CI/CD (requires self-hosted runner)
+```
 
 ## Architecture Overview
 

@@ -21,20 +21,25 @@ windows_root = 'D:/OtherProject/mine/flutter_termux'
 wsl_root = '/home/iml1s/projects/termux-flutter'
 paths = ['scripts', 'patches', 'package.yaml', 'build.toml']
 
+# Patches are now version-based: patches/{version}/*.patch
+# build.py will automatically look for patches in patches/{flutter.tag}/
+[patch]
+dir = './patches'  # Base directory for patches
+
 [patch.engine]
-file = './patches/engine.patch'
+file = 'engine.patch'
 path = '.'
 
 [patch.dart]
-file = './patches/dart.patch'
+file = 'dart.patch'
 path = 'engine/src/flutter/third_party/dart'
 
 [patch.skia]
-file = './patches/skia.patch'
+file = 'skia.patch'
 path = 'engine/src/flutter/third_party/skia'
 
 [patch.flutter_sdk]
-file = './patches/flutter_sdk_arm64_default.patch'
+file = 'flutter_sdk_arm64_default.patch'
 path = '.'
 
 [sysroot]

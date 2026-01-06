@@ -914,6 +914,98 @@ flutter build apk --profile   # ✅ 165MB
 
 ---
 
+## 升級 Flutter 版本
+
+當 Flutter 發布新版本時，按以下步驟升級：
+
+### 1. 準備新版本目錄
+
+```bash
+# 複製現有 patches 作為起點
+cp -r patches/3.35.0 patches/3.36.0
+```
+
+### 2. 更新 build.toml
+
+```toml
+[flutter]
+tag = '3.36.0'  # 更新版本號
+```
+
+### 3. 同步新版本
+
+```bash
+python3 build.py clone
+python3 build.py sync  # 這會下載新版本的 engine
+```
+
+### 4. 嘗試套用 patches
+
+```bash
+python3 build.py patch_engine
+python3 build.py patch_dart
+python3 build.py patch_skia
+python3 build.py patch_flutter_sdk
+```
+
+**如果 patch 失敗：**
+
+1. 查看錯誤訊息，找出衝突的位置
+2. 手動修復 `patches/3.36.0/` 中的 patch 檔案
+3. 重新執行 patch 命令
+
+### 5. 建置新版本
+
+```bash
+python3 build.py sysroot --arch=arm64
+python3 build.py build_all --arch=arm64
+python3 build.py debuild --arch=arm64
+```
+
+### 6. 測試
+
+在乾淨的 Termux 環境測試所有功能：
+
+```bash
+# 安裝
+dpkg -i flutter_3.36.0_aarch64.deb
+apt-get install -f
+bash $PREFIX/share/flutter/post_install.sh
+
+# 測試
+flutter doctor -v
+flutter create test_app && cd test_app
+flutter build apk --release
+flutter build linux
+```
+
+### 7. 發布
+
+```bash
+# 提交變更
+git add -A
+git commit -m "feat: Support Flutter 3.36.0"
+
+# 打 tag
+git tag -a v3.36.0-termux -m "Flutter 3.36.0 for Termux ARM64"
+git push origin master --tags
+
+# 建立 GitHub Release
+gh release create v3.36.0-termux \
+  --title "Flutter 3.36.0 for Termux" \
+  --notes "See CHANGELOG.md" \
+  flutter_3.36.0_aarch64.deb
+```
+
+### Patch 維護技巧
+
+1. **保持 patch 最小化**：只修改必要的部分
+2. **加上註解**：在 patch 中說明為什麼需要這個修改
+3. **版本隔離**：每個 Flutter 版本有獨立的 patch 目錄
+4. **記錄變更**：更新 CHANGELOG.md
+
+---
+
 ## 更新日誌
 
 ### 2025-12-29 v5

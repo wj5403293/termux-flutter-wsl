@@ -82,14 +82,20 @@ class Build:
 
         if isinstance(patches, dict):
             self.patches = {}
+            # Version-based patches: patches/{version}/*.patch
+            patch_base = path / patches.get('dir', './patches') / self.tag
 
             def patch(key):
                 return lambda: self.patch(**self.patches[key])
 
             for k, v in patches.items():
+                if k == 'dir':  # Skip base directory config
+                    continue
+                if not isinstance(v, dict):  # Skip non-dict entries
+                    continue
                 self.patches[k] = {
-                    'file': path/v['file'],
-                    'path': self.root/v['path']}
+                    'file': patch_base / v['file'],
+                    'path': self.root / v['path']}
                 self.__dict__[f'patch_{k}'] = patch(k)
 
     def config(self):

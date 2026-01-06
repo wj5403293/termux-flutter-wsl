@@ -236,8 +236,8 @@ resource:
     mode: 0o644
 
   # Post-install script for APK build environment setup
-  # $root is flutter/, so need ../scripts to reach scripts/
+  # $root is flutter/, so need ../scripts/install to reach scripts/install/
   post_install:
-    source: $root/../scripts/post_install.sh
+    source: $root/../scripts/install/post_install.sh
     output: $prefix/share/flutter/post_install.sh
     mode: 0o755
