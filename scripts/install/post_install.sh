@@ -89,11 +89,8 @@ exec /data/data/com.termux/files/usr/bin/clang++ -L\$LIB_PATH -L\$CLANG_LIB_ARCH
 
     # Create wrappers in prebuilt/linux-x86_64/bin/ (official NDK structure)
     mkdir -p "$PREBUILT/linux-x86_64/bin"
-    if [ -f "$PREBUILT/linux-x86_64/bin/clang" ] && [ ! -L "$PREBUILT/linux-x86_64/bin/clang" ]; then
-        # Backup original x86_64 binaries
-        mv "$PREBUILT/linux-x86_64/bin/clang" "$PREBUILT/linux-x86_64/bin/clang.x86_64.bak" 2>/dev/null || true
-        mv "$PREBUILT/linux-x86_64/bin/clang++" "$PREBUILT/linux-x86_64/bin/clang++.x86_64.bak" 2>/dev/null || true
-    fi
+    # Remove symlinks first (clang -> clang-18, clang++ -> clang chain causes overwrites)
+    rm -f "$PREBUILT/linux-x86_64/bin/clang" "$PREBUILT/linux-x86_64/bin/clang++" 2>/dev/null || true
     echo "$CLANG_WRAPPER" > "$PREBUILT/linux-x86_64/bin/clang"
     chmod +x "$PREBUILT/linux-x86_64/bin/clang"
     echo "$CLANGPP_WRAPPER" > "$PREBUILT/linux-x86_64/bin/clang++"
@@ -127,7 +124,7 @@ SNAPSHOTS_DIR=$DART_SDK/bin/snapshots
 # Check if key snapshot is missing
 if [ ! -f "$SNAPSHOTS_DIR/dds_aot.dart.snapshot" ]; then
     echo "  Downloading dart-sdk-linux-arm64.zip..."
-    cd /tmp
+    cd "${TMPDIR:-$PREFIX/tmp}"
     curl -L -o dart-sdk.zip "$SNAPSHOTS_URL"
     echo "  Extracting snapshots..."
     unzip -o -j dart-sdk.zip 'dart-sdk/bin/snapshots/*' -d "$SNAPSHOTS_DIR"
@@ -262,9 +259,10 @@ chmod +x $BUILD_TOOLS/split-select
 
 # core-lambda-stubs.jar
 if [ ! -f $BUILD_TOOLS/core-lambda-stubs.jar ]; then
-    echo "Manifest-Version: 1.0" > /tmp/MANIFEST.MF
-    jar cfm $BUILD_TOOLS/core-lambda-stubs.jar /tmp/MANIFEST.MF
-    rm /tmp/MANIFEST.MF
+    MANIFEST_TMP="${TMPDIR:-$PREFIX/tmp}/MANIFEST.MF"
+    echo "Manifest-Version: 1.0" > "$MANIFEST_TMP"
+    jar cfm $BUILD_TOOLS/core-lambda-stubs.jar "$MANIFEST_TMP"
+    rm "$MANIFEST_TMP"
 fi
 
 # d8.jar and dx.jar

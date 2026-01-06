@@ -105,8 +105,10 @@ flutter/engine/src/out/
 │   ├── dart-sdk/bin/dart          # Dart binary
 │   ├── gen_snapshot               # Linux gen_snapshot
 │   └── libflutter_linux_gtk.so    # Linux GTK library (~106MB)
-└── android_release_arm64/
-    └── clang_arm64/gen_snapshot   # Android gen_snapshot
+├── android_release_arm64/
+│   └── clang_arm64/gen_snapshot   # Android release gen_snapshot
+└── android_profile_arm64/
+    └── exe.stripped/gen_snapshot  # Android profile gen_snapshot
 ```
 
 ## Ninja Build Targets
@@ -201,14 +203,16 @@ flutter doctor -v
 - Flutter: 3.35.0
 - Target: aarch64 (ARM64)
 
-## Verified Feature Status (2025-12-29)
+## Verified Feature Status (2025-01-06)
 
 | Feature | Status | Requirements |
 |---------|--------|--------------|
 | `flutter doctor` | ✅ | deb install only |
 | `flutter create` | ✅ | deb install only |
 | `flutter build linux` | ✅ | gtk3, x11-repo |
-| `flutter build apk` | ✅ | post_install.sh + project config |
+| `flutter build apk --debug` | ✅ | post_install.sh + project config |
+| `flutter build apk --profile` | ✅ | post_install.sh + project config |
+| `flutter build apk --release` | ✅ | post_install.sh + project config |
 | `flutter run -d linux` | ✅ | termux-x11-nightly, DISPLAY=:0 |
 | `flutter run` (Hot Reload) | ✅ | post_install.sh |
 | APK install | ✅ | Use `adb install` from PC |

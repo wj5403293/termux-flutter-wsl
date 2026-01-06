@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Full Flutter 3.35.0 support for Termux ARM64
-- `flutter build apk` support (ARM64 only)
+- `flutter build apk` support (ARM64 only, debug/profile/release modes)
 - `flutter build linux` support
 - `flutter run` with Hot Reload support
 - Linux desktop app support via Termux X11
@@ -27,7 +27,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Known Limitations
 - APK builds only support ARM64 (android-arm64-v8a)
 - Linux desktop uses debug mode only (sysroot header conflicts)
-- Profile mode not yet supported
 - ARMv7 (android-arm) not supported due to BoringSSL 32-bit issues
 - x86/x64 Android targets not supported
 
