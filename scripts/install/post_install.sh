@@ -89,8 +89,13 @@ exec /data/data/com.termux/files/usr/bin/clang++ -L\$LIB_PATH -L\$CLANG_LIB_ARCH
 
     # Create wrappers in prebuilt/linux-x86_64/bin/ (official NDK structure)
     mkdir -p "$PREBUILT/linux-x86_64/bin"
-    # Remove symlinks first (clang -> clang-18, clang++ -> clang chain causes overwrites)
-    rm -f "$PREBUILT/linux-x86_64/bin/clang" "$PREBUILT/linux-x86_64/bin/clang++" 2>/dev/null || true
+    # Remove symlinks/files first (clang -> clang-18, clang++ -> clang chain causes overwrites)
+    # Must use unlink to properly remove symlinks before writing
+    for f in clang clang++; do
+        if [ -L "$PREBUILT/linux-x86_64/bin/$f" ] || [ -f "$PREBUILT/linux-x86_64/bin/$f" ]; then
+            unlink "$PREBUILT/linux-x86_64/bin/$f" 2>/dev/null || rm "$PREBUILT/linux-x86_64/bin/$f" 2>/dev/null || true
+        fi
+    done
     echo "$CLANG_WRAPPER" > "$PREBUILT/linux-x86_64/bin/clang"
     chmod +x "$PREBUILT/linux-x86_64/bin/clang"
     echo "$CLANGPP_WRAPPER" > "$PREBUILT/linux-x86_64/bin/clang++"
