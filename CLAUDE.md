@@ -222,6 +222,13 @@ flutter doctor -v
 | DevTools | ✅ | During `flutter run` |
 | APK install | ✅ | Use `adb install` from PC |
 
+### Linux Desktop Run Status
+| Mode | Status | Notes |
+|------|--------|-------|
+| `flutter run -d linux --debug` | ✅ | Hot Reload/Restart/DevTools work |
+| `flutter run -d linux --profile` | ⚠️ | Dart VM error (Flutter 3.35.0 bug) |
+| `flutter run -d linux --release` | ✅ | Works correctly |
+
 ## Flutter Run on Android (Wireless Debugging)
 
 To use `flutter run` on Termux:
