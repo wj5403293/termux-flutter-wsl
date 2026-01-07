@@ -122,9 +122,8 @@ In `build.py` `build()` method:
 ## Known Limitations
 
 1. **APK only supports ARM64**: android-arm and android-x64 gen_snapshot cannot be cross-compiled (BoringSSL 32-bit issues, sysroot incompatibility)
-2. **Linux profile mode not supported**: The profile engine has a bug where JIT core snapshots are embedded but the runtime uses AOT mode, causing "Precompiled runtime requires precompiled snapshot" crash. Use debug mode for development or release mode for production testing.
-3. Uses debug mode binaries due to sysroot conflicts (glibc vs bionic headers)
-4. See `BUILD_GUIDE.md` for detailed troubleshooting
+2. Uses debug mode binaries due to sysroot conflicts (glibc vs bionic headers)
+3. See `BUILD_GUIDE.md` for detailed troubleshooting
 
 ## Common Issues
 
@@ -229,7 +228,7 @@ flutter doctor -v
 | Mode | Status | Notes |
 |------|--------|-------|
 | `flutter run -d linux --debug` | ✅ | Hot Reload/Restart/DevTools work |
-| `flutter run -d linux --profile` | ❌ | NOT SUPPORTED - use debug or release |
+| `flutter run -d linux --profile` | ✅ | Requires Termux X11 running |
 | `flutter run -d linux --release` | ✅ | Works correctly |
 
 ## Flutter Run on Android (Wireless Debugging)

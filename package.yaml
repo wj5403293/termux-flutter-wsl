@@ -131,16 +131,9 @@ resource:
       file: $remote/linux-$arch-release/linux-$arch-flutter-gtk.zip
       path: $eng
 
-  # NOTE: Linux profile mode is NOT SUPPORTED on Termux
-  # The profile engine build has a bug where JIT core snapshots are embedded
-  # into libflutter_linux_gtk.so, but the runtime uses AOT (DART_PRECOMPILED_RUNTIME).
-  # This causes "Precompiled runtime requires precompiled snapshot" crash.
-  #
-  # Users should use:
-  # - debug mode: for development with hot reload
-  # - release mode: for production testing and deployment
-  #
-  # Profile gen_snapshot is still included for Android APK profile builds.
+  # Linux profile mode - VERIFIED WORKING (2026-01-07)
+  # Profile mode uses AOT compilation like release, but with profiling enabled.
+  # Requires Termux X11 to be running for flutter run -d linux --profile.
   flutter_linux_gtk_profile:
     <<: *gtk
     define:
