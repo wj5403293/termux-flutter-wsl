@@ -327,5 +327,29 @@ index 28a19c7..5c3992b 100644
 +      deps -= [ "//flutter/third_party/swiftshader/src/Vulkan:swiftshader_libvulkan_static" ]
 +    }
    }
- 
+
    metadata = {
+diff --git a/engine/src/flutter/lib/ui/dart_runtime_hooks.cc b/engine/src/flutter/lib/ui/dart_runtime_hooks.cc
+index 1234567..abcdefg 100644
+--- a/engine/src/flutter/lib/ui/dart_runtime_hooks.cc
++++ b/engine/src/flutter/lib/ui/dart_runtime_hooks.cc
+@@ -148,11 +148,15 @@ static void InitDartIO(Dart_Handle builtin_library,
+
+ #if !FLUTTER_RELEASE
+   // Register dart:io service extensions used for network profiling.
++  // Note: This may fail on Termux ARM64 profile mode, silently ignore
+   Dart_Handle network_profiling_type =
+       Dart_GetNonNullableType(io_lib, ToDart("_NetworkProfiling"), 0, nullptr);
+-  PropagateIfError(network_profiling_type);
+-  result = Dart_Invoke(network_profiling_type,
+-                       ToDart("_registerServiceExtension"), 0, nullptr);
+-  PropagateIfError(result);
++  if (!Dart_IsError(network_profiling_type)) {
++    result = Dart_Invoke(network_profiling_type,
++                         ToDart("_registerServiceExtension"), 0, nullptr);
++    // Silently ignore errors - network profiling is optional
++  } else {
++    FML_LOG(WARNING) << "Network profiling not available: " << Dart_GetError(network_profiling_type);
++  }
+ #endif  // !FLUTTER_RELEASE
+ }

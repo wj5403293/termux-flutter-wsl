@@ -101,8 +101,25 @@ exec /data/data/com.termux/files/usr/bin/clang++ -L\$LIB_PATH -L\$CLANG_LIB_ARCH
     echo "$CLANGPP_WRAPPER" > "$PREBUILT/linux-x86_64/bin/clang++"
     chmod +x "$PREBUILT/linux-x86_64/bin/clang++"
 
-    # Create linux-aarch64 symlink (for some toolchain configs)
-    ln -sf bin "$PREBUILT/linux-aarch64" 2>/dev/null || true
+    # Create linux-aarch64 directory with bin subdirectory (for toolchain configs)
+    # Note: Must NOT symlink linux-aarch64 -> bin because access to linux-aarch64/bin
+    # would incorrectly resolve to bin/bin (which doesn't exist)
+    rm -rf "$PREBUILT/linux-aarch64" 2>/dev/null || true
+    mkdir -p "$PREBUILT/linux-aarch64/bin"
+    cp "$PREBUILT/bin/clang" "$PREBUILT/linux-aarch64/bin/clang"
+    cp "$PREBUILT/bin/clang++" "$PREBUILT/linux-aarch64/bin/clang++"
+
+    # Create all API-level clang wrappers (required by Android Gradle Plugin)
+    for api in 21 24 26 28 29 30 31 32 33 34 35; do
+        ln -sf clang "$PREBUILT/linux-aarch64/bin/armv7a-linux-androideabi${api}-clang"
+        ln -sf clang++ "$PREBUILT/linux-aarch64/bin/armv7a-linux-androideabi${api}-clang++"
+        ln -sf clang "$PREBUILT/linux-aarch64/bin/aarch64-linux-android${api}-clang"
+        ln -sf clang++ "$PREBUILT/linux-aarch64/bin/aarch64-linux-android${api}-clang++"
+        ln -sf clang "$PREBUILT/linux-aarch64/bin/i686-linux-android${api}-clang"
+        ln -sf clang++ "$PREBUILT/linux-aarch64/bin/i686-linux-android${api}-clang++"
+        ln -sf clang "$PREBUILT/linux-aarch64/bin/x86_64-linux-android${api}-clang"
+        ln -sf clang++ "$PREBUILT/linux-aarch64/bin/x86_64-linux-android${api}-clang++"
+    done
 
     # Create sysroot symlink
     ln -sf linux-x86_64/sysroot "$PREBUILT/sysroot" 2>/dev/null || true

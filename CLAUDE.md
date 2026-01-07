@@ -122,17 +122,20 @@ In `build.py` `build()` method:
 ## Known Limitations
 
 1. **APK only supports ARM64**: android-arm and android-x64 gen_snapshot cannot be cross-compiled (BoringSSL 32-bit issues, sysroot incompatibility)
-2. Uses debug mode binaries due to sysroot conflicts (glibc vs bionic headers)
-3. See `BUILD_GUIDE.md` for detailed troubleshooting
+2. **Linux profile mode not supported**: The profile engine has a bug where JIT core snapshots are embedded but the runtime uses AOT mode, causing "Precompiled runtime requires precompiled snapshot" crash. Use debug mode for development or release mode for production testing.
+3. Uses debug mode binaries due to sysroot conflicts (glibc vs bionic headers)
+4. See `BUILD_GUIDE.md` for detailed troubleshooting
 
 ## Common Issues
 
 ### NDK Clang Wrapper Not Found
 **Error**: `CMAKE_C_COMPILER is not a full path to an existing compiler tool`
 
-**Cause**: Gradle downloaded a new NDK version after `post_install.sh` ran.
+**Cause**: Gradle downloaded a new NDK version not configured by `post_install.sh`.
 
-**Fix**: Re-run post_install to configure all NDKs:
+**Prevention**: The profile script auto-sets `ANDROID_NDK_HOME` to use pre-configured NDK.
+
+**Manual Fix** (if needed): Re-run post_install to configure all NDKs:
 ```bash
 bash $PREFIX/share/flutter/post_install.sh
 ```
@@ -203,7 +206,7 @@ flutter doctor -v
 - Flutter: 3.35.0
 - Target: aarch64 (ARM64)
 
-## Verified Feature Status (2025-01-06)
+## Verified Feature Status (2025-01-07)
 
 | Feature | Status | Requirements |
 |---------|--------|--------------|
@@ -226,7 +229,7 @@ flutter doctor -v
 | Mode | Status | Notes |
 |------|--------|-------|
 | `flutter run -d linux --debug` | ✅ | Hot Reload/Restart/DevTools work |
-| `flutter run -d linux --profile` | ⚠️ | Dart VM error (Flutter 3.35.0 bug) |
+| `flutter run -d linux --profile` | ❌ | NOT SUPPORTED - use debug or release |
 | `flutter run -d linux --release` | ✅ | Works correctly |
 
 ## Flutter Run on Android (Wireless Debugging)
@@ -251,10 +254,7 @@ To use `flutter run` on Termux:
    flutter run -d <device_id>
    ```
 
-**Note:** If Gradle downloads new SDK components, re-run `post_install.sh`:
-```bash
-bash $PREFIX/share/flutter/post_install.sh
-```
+**Note:** The profile script auto-sets `ANDROID_NDK_HOME` to prevent Gradle from downloading new NDK versions.
 
 ## APK Build Project Configuration
 
