@@ -114,7 +114,7 @@ bin/cache/artifacts/engine/
 | `flutter run` + Hot Reload | ✅ **完整支援** | ❌ 無法實現 |
 | 效能 | ✅ **原生速度** | ⚠️ x86 模擬，慢 3-5 倍 |
 | 安裝難度 | ✅ **一鍵安裝** | ⚠️ 複雜配置 |
-| APK 大小 | ✅ **正常 (~17MB)** | ⚠️ proot 增加額外開銷 |
+| APK 大小 | ✅ **正常 (~15MB)** | ⚠️ proot 增加額外開銷 |
 
 #### 📊 完整功能對比
 
@@ -156,8 +156,8 @@ bin/cache/artifacts/engine/
 | `flutter create` | ✅ 已驗證 | 可創建新專案 |
 | `flutter run -d linux` | ✅ 已驗證 | 需要 Termux:X11 |
 | `flutter build linux` | ✅ 已驗證 | 產出 ARM64 ELF 執行檔 |
-| `flutter build apk` | ✅ 已驗證 | 需執行 post_install.sh |
-| `flutter run` (Android) | ✅ 已驗證 | Hot reload 支援！需執行 post_install.sh |
+| `flutter build apk` | ✅ 已驗證 | 一鍵安裝已包含所有配置 |
+| `flutter run` (Android) | ✅ 已驗證 | Hot reload 支援！一鍵安裝已包含 |
 
 > ✅ **v3.35.0 正式版**：所有功能已驗證可用！包含 hot reload 支援！
 
@@ -260,7 +260,7 @@ flutter doctor
 > - Android cmdline-tools
 > - ELF 二進制清理（修復 linker warning）
 
-### 安裝腳本更新日誌 (v13)
+### 安裝腳本更新日誌 (v14)
 
 最新版安裝腳本修復了多個關鍵問題，確保在乾淨 Termux 環境下所有功能正常：
 
@@ -274,7 +274,7 @@ flutter doctor
 | **NDK clang** | 移除不必要的 wrapper，ARM64 NDK 原生 clang 可直接使用 |
 
 <details>
-<summary><b>🔧 v13 修復的技術細節</b></summary>
+<summary><b>🔧 v14 修復的技術細節</b></summary>
 
 **libc++_shared.so 問題**：
 
@@ -337,28 +337,25 @@ flutter run -d linux
 
 ### 構建 Android APK
 
-> ✅ **已驗證可用**：APK 構建功能已在 ARM64 設備上驗證成功！
+> ✅ **已驗證可用**：APK 構建功能已在 ARM64 設備上驗證成功！（2026-01-07）
 
-要在 Termux 中執行 `flutter build apk`，需要安裝 Android SDK。提供兩種方式：
+如果你使用 `install_flutter_complete.sh` 一鍵安裝，所有環境已配置完成，可直接構建 APK。
+手動安裝 deb 的用戶需要額外配置 Android SDK。
 
-#### 方式 A：一鍵安裝（推薦）
+#### 方式 A：使用一鍵安裝腳本（推薦）
+
+如果你使用了上方的 `install_flutter_complete.sh` 一鍵安裝，APK 構建環境已經完全配置好：
 
 ```bash
-# 1. 安裝 Android SDK（約 700MB）
-curl -sL https://raw.githubusercontent.com/ImL1s/termux-flutter-wsl/master/setup_android_sdk.sh | bash
-source ~/.bashrc
-
-# 2. 創建專案並構建 APK
+# 直接創建專案並構建
 flutter create myapp
 cd myapp
-
-# 3. 一鍵配置並構建（自動處理 NDK、AAPT2 等問題）
-curl -sL https://raw.githubusercontent.com/ImL1s/termux-flutter-wsl/master/build_first_apk.sh | bash
+flutter build apk --release
 ```
 
 > 首次構建約需 3-5 分鐘（下載 Gradle 依賴）
 
-#### 方式 B：手動安裝
+#### 方式 B：手動安裝（僅限手動安裝 deb 的用戶）
 
 <details>
 <summary><b>展開手動安裝步驟</b></summary>
@@ -519,7 +516,7 @@ flutter build apk --release
 > 💡 **影響範圍**：產出的 APK 只能在 ARM64 設備上運行。大多數現代 Android 設備（2019 年後）都是 ARM64。
 
 <details>
-<summary><b>📝 技術限制詳細分析（2025-12-28 測試）</b></summary>
+<summary><b>📝 技術限制詳細分析（2026-01-07 測試）</b></summary>
 
 我們嘗試編譯了 android-arm 和 android-x64 的 gen_snapshot，結果如下：
 
@@ -544,7 +541,7 @@ flutter build apk --release
 > 輸出示例：
 > ```
 > Running Gradle task 'assembleRelease'...                          230.4s
-> ✓ Built build/app/outputs/flutter-apk/app-release.apk (17.2MB)
+> ✓ Built build/app/outputs/flutter-apk/app-release.apk (~14.6MB)
 > ```
 
 <details>
