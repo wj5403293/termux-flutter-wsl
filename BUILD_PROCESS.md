@@ -289,7 +289,7 @@ release/flutter_3.35.0_aarch64.deb
 
 在新的 Termux 環境測試：
 ```bash
-curl -sL https://raw.githubusercontent.com/ImL1s/termux-flutter-wsl/master/install_termux_flutter.sh | bash
+curl -sL https://raw.githubusercontent.com/ImL1s/termux-flutter-wsl/master/install_flutter_complete.sh -o ~/install.sh && bash ~/install.sh
 ```
 
 ---

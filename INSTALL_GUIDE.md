@@ -13,13 +13,18 @@
 
 ## 方法一：一鍵安裝（推薦）
 
+完整安裝 Flutter + Android SDK + NDK，安裝後可直接 `flutter build apk`：
+
 ```bash
-curl -sL https://raw.githubusercontent.com/ImL1s/termux-flutter-wsl/master/install_termux_flutter.sh | bash
+curl -sL https://raw.githubusercontent.com/ImL1s/termux-flutter-wsl/master/install_flutter_complete.sh -o ~/install.sh && bash ~/install.sh
 ```
 
-安裝完成後，重新載入環境：
+> 總大小約 1.8GB，需要 10-30 分鐘。
+
+安裝完成後，重新啟動 Termux 或執行：
 ```bash
 source ~/.bashrc
+flutter doctor
 ```
 
 ## 方法二：手動安裝

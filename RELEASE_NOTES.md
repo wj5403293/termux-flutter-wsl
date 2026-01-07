@@ -6,7 +6,7 @@
 
 ### 方法 1: 一鍵安裝（推薦）
 ```bash
-curl -sL https://raw.githubusercontent.com/ImL1s/termux-flutter-wsl/master/scripts/install.sh | bash
+curl -sL https://raw.githubusercontent.com/ImL1s/termux-flutter-wsl/master/install_flutter_complete.sh -o ~/install.sh && bash ~/install.sh
 ```
 
 ### 方法 2: 手動安裝
@@ -106,12 +106,13 @@ android.aapt2FromMavenOverride=/data/data/com.termux/files/usr/bin/aapt2
 
 ## 更新內容
 
-### v3.35.0 (2025-12-29)
+### v3.35.0 (2026-01-07)
 - 首次公開發布
 - Flutter SDK 3.35.0
-- 完整支援 APK 構建（debug/release/profile）
-- 完整支援 Linux 桌面構建
-- 包含 post_install.sh 自動配置腳本
+- 完整支援 APK 構建（debug/profile/release）
+- 完整支援 Linux 桌面構建（debug/profile/release）
+- `flutter run` + Hot Reload 支援
+- 包含 `install_flutter_complete.sh` 一鍵安裝腳本
 - 支援無線 ADB 調試
 
 ## 致謝
