@@ -96,7 +96,7 @@ resource:
       - $any/gen_snapshot
       - $any/libpath_ops.so
       - $any/libtessellator.so
-      - $any/const_finder.dart.snapshot
+      - $any/gen/const_finder.dart.snapshot
     output:
       - $eng/linux-$arch
     define:
@@ -158,11 +158,13 @@ resource:
       file: $remote/flutter_patched_sdk.zip
       path: &com $eng/common
 
+  # Use debug output for product SDK since we only build debug mode
+  # The product dill files are identical to debug for our Termux use case
   flutter_patched_sdk_product:
     <<: *sdk
     define:
       eng: *eng
-      out: output.release
+      out: *any
       fix: '"_product"'
     test:
       file: $remote/flutter_patched_sdk_product.zip

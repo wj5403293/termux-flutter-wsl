@@ -23,6 +23,12 @@ python3 build.py sysroot --arch=arm64            # Build sysroot
 python3 build.py configure --arch=arm64 --mode=debug
 python3 build.py build --arch=arm64 --mode=debug
 python3 build.py build_dart --arch=arm64 --mode=debug
+python3 build.py build_impellerc --arch=arm64 --mode=debug
+python3 build.py build_const_finder --arch=arm64 --mode=debug
+python3 build.py configure --arch=arm64 --mode=release    # Linux release engine
+python3 build.py build --arch=arm64 --mode=release
+python3 build.py configure --arch=arm64 --mode=profile    # Linux profile engine
+python3 build.py build --arch=arm64 --mode=profile
 
 # Android gen_snapshot (for flutter build apk)
 python3 build.py configure_android --arch=arm64 --mode=release
@@ -44,6 +50,9 @@ python3 build.py debuild --arch=arm64
 | `utils.py` | Build utilities and path helpers |
 | `patches/{version}/*.patch` | Version-specific Engine/Dart/Skia patches |
 | `scripts/install/post_install.sh` | Post-installation setup for APK builds |
+| `scripts/build/` | Build helper scripts (profile, gen_snapshot, etc.) |
+| `scripts/setup/` | WSL/NDK/Gradle environment setup scripts |
+| `scripts/fix/` | Workaround scripts (aapt2, gradle, SSH) |
 | `install_flutter_complete.sh` | One-command Termux installation script |
 | `CHANGELOG.md` | Version history and release notes |
 | `BUILD_GUIDE.md` | Detailed build guide and troubleshooting |
@@ -56,7 +65,7 @@ flutter_termux/
 ├── build.toml                  # Build configuration
 ├── install_flutter_complete.sh # Termux installation script
 ├── patches/
-│   └── 3.35.0/                 # Version-specific patches
+│   └── 3.41.5/                 # Version-specific patches
 │       ├── engine.patch
 │       ├── dart.patch
 │       └── skia.patch
@@ -103,8 +112,14 @@ flutter_termux/
 flutter/engine/src/out/
 ├── linux_debug_arm64/
 │   ├── dart-sdk/bin/dart          # Dart binary
-│   ├── gen_snapshot               # Linux gen_snapshot
+│   ├── gen_snapshot               # Linux gen_snapshot (release mode VM)
 │   └── libflutter_linux_gtk.so    # Linux GTK library (~106MB)
+├── linux_release_arm64/
+│   ├── gen_snapshot               # Release gen_snapshot
+│   └── libflutter_linux_gtk.so    # Release GTK library
+├── linux_profile_arm64/
+│   ├── gen_snapshot               # Profile gen_snapshot
+│   └── libflutter_linux_gtk.so    # Profile GTK library
 ├── android_release_arm64/
 │   └── clang_arm64/gen_snapshot   # Android release gen_snapshot
 └── android_profile_arm64/
@@ -119,10 +134,17 @@ In `build.py` `build()` method:
 
 **Important**: `flutter_gtk` target must be enabled, otherwise `flutter build linux` fails.
 
+## Internal Patterns
+
+- **`@utils.record` / `@utils.recordm`**: Decorators that auto-log all method calls with args. Set `NO_RECORD=1` to disable.
+- **`Build.sync()`**: Detects Windows vs WSL via `platform.system()`. On Windows, wraps `cp` in `wsl -e bash -c`; on WSL, runs directly.
+- **`Package.__format__()`**: Uses `string.Template.safe_substitute()` for `$variable` expansion in `package.yaml`.
+- **`package.yaml` `define` blocks**: Use `eval()` with globals (`root`, `arch`, `output`, `version`) — never put untrusted strings here.
+
 ## Known Limitations
 
 1. **APK only supports ARM64**: android-arm and android-x64 gen_snapshot cannot be cross-compiled (BoringSSL 32-bit issues, sysroot incompatibility)
-2. Uses debug mode binaries due to sysroot conflicts (glibc vs bionic headers)
+2. **`utils.py __MODE__` must be `('debug', 'release', 'profile')`**: debug first! `Output.any` picks the first existing directory. If release comes first, product mode dart-sdk snapshots break the entire Flutter CLI.
 3. See `BUILD_GUIDE.md` for detailed troubleshooting
 
 ## Common Issues
@@ -181,11 +203,11 @@ chmod +x depot_tools/vpython3
 
 ```powershell
 # Transfer deb to device
-powershell -Command "adb push 'flutter_3.35.0_aarch64.deb' '/data/local/tmp/'"
+powershell -Command "adb push 'flutter_3.41.5_aarch64.deb' '/data/local/tmp/'"
 
 # Install in Termux
 pkg install x11-repo
-dpkg -i /data/local/tmp/flutter_3.35.0_aarch64.deb
+dpkg -i /data/local/tmp/flutter_3.41.5_aarch64.deb
 apt-get install -f
 bash $PREFIX/share/flutter/post_install.sh  # Required for APK builds!
 
@@ -202,16 +224,19 @@ flutter doctor -v
 
 ## Version Info
 
-- Flutter: 3.35.0
+- Flutter: 3.41.5
+- Dart SDK: 3.11.3
 - Target: aarch64 (ARM64)
 
-## Verified Feature Status (2026-01-07)
+## Verified Feature Status (2026-03-25)
 
 | Feature | Status | Requirements |
 |---------|--------|--------------|
 | `flutter doctor` | ✅ | deb install only |
 | `flutter create` | ✅ | deb install only |
-| `flutter build linux` | ✅ | gtk3, x11-repo |
+| `flutter build linux --debug` | ✅ | gtk3, x11-repo |
+| `flutter build linux --release` | ✅ | gtk3, x11-repo |
+| `flutter build linux --profile` | ✅ | gtk3, x11-repo |
 | `flutter build apk --debug` | ✅ | post_install.sh + project config |
 | `flutter build apk --profile` | ✅ | post_install.sh + project config |
 | `flutter build apk --release` | ✅ | post_install.sh + project config |

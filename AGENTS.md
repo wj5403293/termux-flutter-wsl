@@ -13,7 +13,7 @@ Cross-compile Flutter SDK for Termux (Android/Bionic ARM64). Produces a `.deb` p
 python3 build.py build_all --arch=arm64
 
 # Individual steps
-python3 build.py clone                                    # Clone Flutter 3.35.0
+python3 build.py clone                                    # Clone Flutter 3.41.5
 python3 build.py sync                                     # gclient sync (~30GB)
 python3 build.py patch_engine && python3 build.py patch_dart && python3 build.py patch_skia
 python3 build.py sysroot --arch=arm64                     # Assemble Termux sysroot from apt
@@ -22,6 +22,10 @@ python3 build.py build --arch=arm64 --mode=debug          # ninja build
 python3 build.py build_dart --arch=arm64 --mode=debug     # dart binary (separate!)
 python3 build.py build_impellerc --arch=arm64 --mode=debug
 python3 build.py build_const_finder --arch=arm64 --mode=debug
+python3 build.py configure --arch=arm64 --mode=release    # Linux release engine
+python3 build.py build --arch=arm64 --mode=release
+python3 build.py configure --arch=arm64 --mode=profile    # Linux profile engine
+python3 build.py build --arch=arm64 --mode=profile
 python3 build.py configure_android --arch=arm64 --mode=release
 python3 build.py build_android_gen_snapshot --arch=arm64 --mode=release
 python3 build.py debuild --arch=arm64                     # Package .deb
@@ -47,6 +51,7 @@ python3 build.py debuild --arch=arm64                     # Package .deb
 4. **`package.yaml` uses `eval()`** for variable resolution — be careful with template strings.
 5. **`debuild()` auto-syncs** from Windows to WSL via `[sync]` config before packaging.
 6. **GN flag `is_termux=true`** activates custom BUILD.gn rules that add `-llog -lm` for Android logging symbols.
+7. **`utils.py __MODE__` must be `('debug', 'release', 'profile')`** — debug first! `Output.any` picks the first existing directory. If release comes first, `output.any` points to release (product mode) dart-sdk snapshots, breaking the entire Flutter CLI.
 
 ## Termux Runtime: post_install.sh Auto-Fixes
 
@@ -79,6 +84,8 @@ android {
 ```
 flutter/engine/src/out/
 ├── linux_debug_arm64/          # Main: dart-sdk, gen_snapshot, libflutter_linux_gtk.so
+├── linux_release_arm64/        # Release: gen_snapshot, libflutter_linux_gtk.so
+├── linux_profile_arm64/        # Profile: gen_snapshot, libflutter_linux_gtk.so
 ├── android_release_arm64/      # Android gen_snapshot (release APK)
 └── android_profile_arm64/      # Android gen_snapshot (profile APK)
 ```
@@ -87,6 +94,6 @@ flutter/engine/src/out/
 
 - Build: WSL2 Ubuntu on Windows, NDK r27d at `/opt/android-ndk-r27d`
 - WSL path: `/home/iml1s/projects/termux-flutter/`
-- Target: aarch64, Flutter 3.35.0
+- Target: aarch64, Flutter 3.41.5
 - Test device: `RFCNC0WNT9H`
 - Use PowerShell (not Git Bash) for `adb push` to avoid path mangling

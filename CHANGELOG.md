@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.41.5-termux] - 2026-03-25
+
+### Added
+- Flutter version upgrade: 3.35.0 → 3.41.5 (Dart 3.11.3)
+- **Linux release/profile engine builds**: `build_all()` now compiles all three Linux modes (debug, release, profile)
+- Full build matrix verified on device (6/6): Linux debug/release/profile + APK debug/release/profile
+
+### Fixed
+- **`flutter build linux` (release/profile) failure**: `build_all()` was only building debug mode engine for Linux, leaving `linux_release_arm64/` and `linux_profile_arm64/` empty in the deb package
+- **`utils.py __MODE__` ordering bug**: Original order `('release', 'debug', 'profile')` caused `Output.any` to select release (product mode) dart-sdk snapshots when release directory exists, breaking the entire Flutter CLI. Fixed to `('debug', 'release', 'profile')`
+
+### Technical Details
+- Build output now includes 5 directories: `linux_debug_arm64/`, `linux_release_arm64/`, `linux_profile_arm64/`, `android_release_arm64/`, `android_profile_arm64/`
+- `build_all()` expanded from 8 to 12 steps to include Linux release/profile configure+build
+- Deb package size increased from ~541MB to ~662MB due to additional engine artifacts
+
+---
+
 ## [3.35.0-termux] - 2026-01-07
 
 ### Added

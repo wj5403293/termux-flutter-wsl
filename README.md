@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Flutter-3.35.0-02569B?logo=flutter" alt="Flutter Version"/>
+  <img src="https://img.shields.io/badge/Flutter-3.41.5-02569B?logo=flutter" alt="Flutter Version"/>
   <img src="https://img.shields.io/badge/Platform-ARM64-green" alt="Platform"/>
   <img src="https://img.shields.io/badge/Build-WSL-0078D6?logo=windows" alt="WSL"/>
   <img src="https://img.shields.io/badge/build_apk-✓-success" alt="Build APK"/>
@@ -95,7 +95,7 @@ bin/cache/artifacts/engine/
 | 項目 | 原專案 | 本專案 |
 |---|---|---|
 | 構建環境 | Linux / Termux 原生 | **WSL (Windows)** |
-| Flutter 版本 | 3.29.2 | **3.35.0** |
+| Flutter 版本 | 3.29.2 | **3.41.5** |
 | Android 兼容性 | ❌ 不支援 Android 14+ | ✅ **支援 Android 16** |
 | 額外修復 | - | **`-llog`, `-lm` 依賴** |
 | 文檔 | 基礎 | **完整中文指南** |
@@ -159,13 +159,13 @@ bin/cache/artifacts/engine/
 | `flutter build apk` | ✅ 已驗證 | 一鍵安裝已包含所有配置 |
 | `flutter run` (Android) | ✅ 已驗證 | Hot reload 支援！一鍵安裝已包含 |
 
-> ✅ **v3.35.0 正式版**：所有功能已驗證可用！包含 hot reload 支援！
+> ✅ **v3.41.5 正式版**：所有功能已驗證可用！包含 hot reload 支援！
 
 ### ✨ 主要特色
 
 - 🪟 在 Windows WSL 環境下完成交叉編譯
 - 🔧 修復了 Android 日誌符號缺失問題
-- 📦 成功產出 `flutter_3.35.0_aarch64.deb` (541MB)
+- 📦 成功產出 `flutter_3.41.5_aarch64.deb` (662MB)
 - 🤖 完整的自動化構建流程
 
 ### ⚠️ 系統需求
@@ -240,10 +240,10 @@ flutter doctor
 pkg update && pkg install x11-repo wget openjdk-21
 
 # 2. 下載安裝包
-wget https://github.com/ImL1s/termux-flutter-wsl/releases/download/3.35.0/flutter_3.35.0_aarch64.deb
+wget https://github.com/ImL1s/termux-flutter-wsl/releases/download/3.41.5/flutter_3.41.5_aarch64.deb
 
 # 3. 安裝
-dpkg -i flutter_3.35.0_aarch64.deb
+dpkg -i flutter_3.41.5_aarch64.deb
 apt --fix-broken install -y
 
 # 4. 執行 post-install 腳本（配置 APK 構建和 hot reload）
@@ -337,7 +337,7 @@ flutter run -d linux
 
 ### 構建 Android APK
 
-> ✅ **已驗證可用**：APK 構建功能已在 ARM64 設備上驗證成功！（2026-01-07）
+> ✅ **已驗證可用**：APK 構建功能已在 ARM64 設備上驗證成功！（2026-03-25）
 
 如果你使用 `install_flutter_complete.sh` 一鍵安裝，所有環境已配置完成，可直接構建 APK。
 手動安裝 deb 的用戶需要額外配置 Android SDK。
@@ -713,12 +713,12 @@ python3 build.py build_android_gen_snapshot --arch=arm64 --mode=release
 這個 gen_snapshot 的特點：
 - **運行在** ARM64 Termux 上
 - **產生** Android ARM64 AOT 機器碼
-- **已包含** 在 `flutter_3.35.0_aarch64.deb` 安裝包中
+- **已包含** 在 `flutter_3.41.5_aarch64.deb` 安裝包中
 
 > ✅ **已驗證**：gen_snapshot 在 Termux 上成功運行：
 > ```
 > $ gen_snapshot --version
-> Dart SDK version: 3.9.0 on "android_arm64"
+> Dart SDK version: 3.11.3 on "android_arm64"
 > ```
 
 **技術說明**：官方 Flutter SDK 的 gen_snapshot 只能在 x86_64 Linux 上運行。我們使用 NDK 交叉編譯了一個能在 ARM64 Android (Termux) 上原生運行的版本，這是實現 `flutter build apk` 的關鍵。

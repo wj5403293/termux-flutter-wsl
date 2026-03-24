@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Flutter-3.35.0-02569B?logo=flutter" alt="Flutter Version"/>
+  <img src="https://img.shields.io/badge/Flutter-3.41.5-02569B?logo=flutter" alt="Flutter Version"/>
   <img src="https://img.shields.io/badge/Platform-ARM64-green" alt="Platform"/>
   <img src="https://img.shields.io/badge/Build-WSL-0078D6?logo=windows" alt="WSL"/>
   <img src="https://img.shields.io/badge/build_apk-✓-success" alt="Build APK"/>
@@ -95,7 +95,7 @@ This project is based on [mumumusuc/termux-flutter](https://github.com/mumumusuc
 | Feature | Upstream | This Project |
 |---|---|---|
 | Build Env | Linux / Termux Native | **WSL (Windows)** |
-| Flutter Ver | 3.29.2 | **3.35.0** |
+| Flutter Ver | 3.29.2 | **3.41.5** |
 | Android Compat | ❌ No Android 14+ | ✅ **Android 16 Tested** |
 | Fixes | - | **`-llog`, `-lm` deps** |
 | Docs | Basic | **Full Guide (EN/ZH)** |
@@ -159,13 +159,13 @@ This project is **the world's first** to achieve a **complete Flutter developmen
 | `flutter build apk` | ✅ Verified | Requires post_install.sh |
 | `flutter run` (Android) | ✅ Verified | Hot reload works! Requires post_install.sh |
 
-> ✅ **v3.35.0 Release**: All features verified! Including hot reload support!
+> ✅ **v3.41.5 Release**: All features verified! Including hot reload support!
 
 ### ✨ Features
 
 - 🪟 Cross-compile entirely within Windows WSL
 - 🔧 Fixed missing Android log symbols (`-llog`)
-- 📦 Produced `flutter_3.35.0_aarch64.deb` (541MB)
+- 📦 Produced `flutter_3.41.5_aarch64.deb` (662MB)
 - 🤖 Fully automated build scripts
 
 ### ⚠️ System Requirements
@@ -240,10 +240,10 @@ flutter doctor
 pkg update && pkg install x11-repo wget openjdk-21
 
 # 2. Download package
-wget https://github.com/ImL1s/termux-flutter-wsl/releases/download/3.35.0/flutter_3.35.0_aarch64.deb
+wget https://github.com/ImL1s/termux-flutter-wsl/releases/download/3.41.5/flutter_3.41.5_aarch64.deb
 
 # 3. Install
-dpkg -i flutter_3.35.0_aarch64.deb
+dpkg -i flutter_3.41.5_aarch64.deb
 apt --fix-broken install -y
 
 # 4. Run post-install script (configures APK build and hot reload)
@@ -632,7 +632,7 @@ python3 build.py build_android_gen_snapshot --arch=arm64 --mode=release
 This gen_snapshot:
 - **Runs on** ARM64 Termux
 - **Produces** Android ARM64 AOT machine code
-- **Included** in the `flutter_3.35.0_aarch64.deb` package
+- **Included** in the `flutter_3.41.5_aarch64.deb` package
 
 > ✅ **Verified**: gen_snapshot runs successfully on Termux:
 > ```

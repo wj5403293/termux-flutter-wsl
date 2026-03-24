@@ -44,7 +44,7 @@ Windows (edit files)
     ├── package.py          ← Reads package.yaml, builds data.tar.xz + control.tar.xz → .deb
     ├── package.yaml        ← Declarative: maps build artifacts → deb install paths
     ├── utils.py            ← Arch mapping, output paths, Termux detection
-    └── patches/3.35.0/     ← Engine/Dart/Skia patches (version-specific)
+    └── patches/3.41.5/     ← Engine/Dart/Skia patches (version-specific)
     │
     ▼ (sync to WSL via [sync] config in build.toml)
 WSL Ubuntu (build)
@@ -53,8 +53,10 @@ WSL Ubuntu (build)
     │   └── engine/src/     ← Engine source (gclient managed)
     │       └── out/
     │           ├── linux_debug_arm64/     ← Main output (dart, gen_snapshot, libflutter_linux_gtk.so)
-    │           ├── android_release_arm64/ ← Android gen_snapshot (release)
-    │           └── android_profile_arm64/ ← Android gen_snapshot (profile)
+            ├── linux_release_arm64/   ← Release engine (gen_snapshot, libflutter_linux_gtk.so)
+            ├── linux_profile_arm64/   ← Profile engine (gen_snapshot, libflutter_linux_gtk.so)
+            ├── android_release_arm64/ ← Android gen_snapshot (release)
+            └── android_profile_arm64/ ← Android gen_snapshot (profile)
     │
     ▼ (adb push .deb → dpkg -i on device)
 Termux (runtime)
@@ -74,6 +76,8 @@ Termux (runtime)
 5. **`package.yaml` is declarative**: Describes source→output mappings with variable substitution (`$root`, `$any`, `$eng`). The `Package` class evaluates these with `eval()` and generates tar entries.
 
 6. **Windows↔WSL sync**: `build.toml [sync]` section defines paths to copy from Windows mount to WSL native fs before `debuild`, preventing stale-file issues.
+
+7. **`utils.py __MODE__` must be `('debug', 'release', 'profile')`**: `Output.any` picks the first existing build directory. If `release` is first and `linux_release_arm64/` exists, `output.any` selects it — its `product` mode dart-sdk snapshots will break the entire Flutter CLI. Debug must always be first.
 
 ## Termux Runtime: post_install.sh Auto-Fixes
 
@@ -115,7 +119,7 @@ android {
 - Host: Windows + WSL2 Ubuntu, Ryzen 9950X3D (24 threads allocated)
 - NDK: r27d at `/opt/android-ndk-r27d`
 - WSL build dir: `/home/iml1s/projects/termux-flutter/`
-- Flutter: 3.35.0
+- Flutter: 3.41.5
 - Target: aarch64 (ARM64)
 - Test device: `RFCNC0WNT9H`
 
@@ -123,10 +127,10 @@ android {
 
 ```powershell
 # From Windows (use PowerShell, NOT Git Bash — path mangling)
-adb push flutter_3.35.0_aarch64.deb /data/local/tmp/
+adb push flutter_3.41.5_aarch64.deb /data/local/tmp/
 
 # In Termux
-dpkg -i /data/local/tmp/flutter_3.35.0_aarch64.deb
+dpkg -i /data/local/tmp/flutter_3.41.5_aarch64.deb
 apt-get install -f
 bash $PREFIX/share/flutter/post_install.sh  # Required for APK builds
 source $PREFIX/etc/profile.d/flutter.sh
