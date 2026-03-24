@@ -43,7 +43,7 @@ python3 build.py debuild --arch=arm64                     # Package .deb
 
 1. **`ninja flutter` does NOT build `dart` binary**. Must run `build_dart()` separately.
 2. **Only ARM64 APK gen_snapshot works**. 32-bit ARM fails (BoringSSL), x64 fails (sysroot mismatch).
-3. **Uses debug mode for Linux target** due to bionic/glibc sysroot conflicts in release mode.
+3. **Linux target builds all three modes** (debug, release, profile). `build_all()` runs configure+build for each mode.
 4. **`package.yaml` uses `eval()`** for variable resolution — be careful with template strings.
 5. **`debuild()` auto-syncs** from Windows to WSL via `[sync]` config before packaging.
 6. **GN flag `is_termux=true`** activates custom BUILD.gn rules that add `-llog -lm` for Android logging symbols.

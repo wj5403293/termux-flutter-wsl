@@ -63,7 +63,7 @@ Termux (runtime)
 
 ## Key Design Decisions
 
-1. **Debug mode for Linux binaries**: Uses debug mode because Termux sysroot (bionic) conflicts with glibc headers in release/profile compilation paths.
+1. **Linux target builds all three modes** (debug, release, profile). `build_all()` runs configure+build for each mode.
 
 2. **`ninja flutter` does NOT build dart binary**: Must call `build_dart()` separately — it builds `exe.unstripped/dart` and copies to `dart-sdk/bin/dart`.
 

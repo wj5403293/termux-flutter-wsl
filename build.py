@@ -66,7 +66,7 @@ class Build:
         self.repo = repo or 'https://github.com/flutter/flutter'
         self.arch = arch or 'arm64'
         self.mode = mode or 'debug'
-        self.sysroot = Sysroot(path=path/syspath, **sysroot)
+        self._sysroot = Sysroot(path=path/syspath, **sysroot)
         self.root = path/root
         self.gclient = path/gclient
         self.release = path/release
@@ -133,9 +133,69 @@ class Build:
         cmd = ['gclient', 'sync', '-DR', '--no-history']
         subprocess.run(cmd, cwd=src, check=True)
 
+        # Fix #5: package_config.json language version too old
+        # 1. Replace prebuilt dart-sdk with matching version (3.11.3)
+        dart_sdk_dir = Path(src) / 'engine' / 'src' / 'third_party' / 'dart' / 'tools' / 'sdks' / 'dart-sdk'
+        if dart_sdk_dir.exists():
+            import urllib.request
+            import zipfile
+            import tempfile
+            
+            version_file = dart_sdk_dir / 'version'
+            if version_file.exists() and version_file.read_text().strip() == '3.11.3':
+                logger.info('Dart SDK already replaced with 3.11.3')
+            else:
+                logger.info('Replacing prebuilt dart-sdk with 3.11.3...')
+                url = 'https://storage.googleapis.com/dart-archive/channels/stable/release/3.11.3/sdk/dartsdk-linux-x64-release.zip'
+                with tempfile.TemporaryDirectory() as tmp_dir:
+                    zip_path = Path(tmp_dir) / 'dartsdk.zip'
+                    urllib.request.urlretrieve(url, zip_path)
+                    
+                    shutil.rmtree(dart_sdk_dir)
+                    with zipfile.ZipFile(zip_path, 'r') as zf:
+                        zf.extractall(dart_sdk_dir.parent)
+                
+                logger.success('Fixed #5: Replaced prebuilt dart-sdk with version 3.11.3')
+
+        # 2. Run dart pub get in third_party/dart/
+        dart_dir = Path(src) / 'engine' / 'src' / 'third_party' / 'dart'
+        if dart_dir.exists():
+            logger.info('Running dart pub get in third_party/dart/ ...')
+            dart_bin = dart_sdk_dir / 'bin' / 'dart'
+            cmd_pub = [str(dart_bin), 'pub', 'get']
+            subprocess.run(cmd_pub, cwd=dart_dir, check=True)
+            logger.success('Fixed #5: Finished dart pub get')
+
     def patch(self, *, file, path):
         repo = git.Repo(path)
         repo.git.apply([file])
+
+    def sysroot(self, arch: str = 'arm64'):
+        """Assemble Termux sysroot and apply fixes."""
+        self._sysroot(arch=arch)
+        
+        sysroot_path = Path(self._sysroot.path)
+        
+        # Fix #3: Remove c++/v1 headers from sysroot (avoid libcxx conflict)
+        cxx_dir = sysroot_path / 'usr' / 'include' / 'c++'
+        if cxx_dir.is_dir():
+            cxx_bak = sysroot_path / 'usr' / 'include' / 'c++.bak'
+            if cxx_bak.exists():
+                shutil.rmtree(cxx_bak)
+            os.rename(cxx_dir, cxx_bak)
+            logger.success("Fixed #3: Renamed sysroot c++ headers to c++.bak")
+
+        # Fix #4: Patch glib-typeof.h to wrap <type_traits> with extern "C++"
+        glib_typeof = sysroot_path / 'usr' / 'include' / 'glib-2.0' / 'glib' / 'glib-typeof.h'
+        if glib_typeof.exists():
+            content = glib_typeof.read_text(encoding='utf-8')
+            if '<type_traits>' in content and 'extern "C++"' not in content:
+                content = content.replace(
+                    '#include <type_traits>',
+                    'extern "C++" {\\n#include <type_traits>\\n}'
+                )
+                glib_typeof.write_text(content, encoding='utf-8')
+                logger.success("Fixed #4: Patched glib-typeof.h with extern C++ wrapper")
 
     def configure(
         self,
@@ -147,7 +207,7 @@ class Build:
         toolchain: str = None,
     ):
         root = root or self.root
-        sysroot = os.path.abspath(sysroot or self.sysroot.path)
+        sysroot = os.path.abspath(sysroot or self._sysroot.path)
         toolchain = os.path.abspath(toolchain or self.toolchain)
         cmd = [
             'python3',
@@ -316,7 +376,7 @@ class Build:
         - Produces Android ARM64 AOT code
         """
         root = root or self.root
-        sysroot = os.path.abspath(sysroot or self.sysroot.path)
+        sysroot = os.path.abspath(sysroot or self._sysroot.path)
         toolchain = os.path.abspath(toolchain or self.toolchain)
 
         # Output directory for Android build
@@ -496,40 +556,54 @@ class Build:
         """
         logger.info('=== Starting complete Flutter Termux build ===')
 
-        # Step 1: Build Linux debug (for flutter run -d linux)
-        logger.info('[1/7] Configuring Linux debug...')
+        # Step 1: Build Linux debug (for flutter run -d linux --debug)
+        logger.info('[1/10] Configuring Linux debug...')
         self.configure(arch=arch, mode='debug')
 
-        logger.info('[2/7] Building Flutter engine + dart...')
+        logger.info('[2/10] Building Flutter engine + dart...')
         self.build(arch=arch, mode='debug', jobs=jobs)
         self.build_dart(arch=arch, mode='debug', jobs=jobs)
 
         # Step 3: Build impellerc (for shader compilation)
-        logger.info('[3/7] Building impellerc...')
+        logger.info('[3/10] Building impellerc...')
         self.build_impellerc(arch=arch, mode='debug', jobs=jobs)
 
         # Step 4: Build const_finder (for icon tree shaking)
-        logger.info('[4/7] Building const_finder...')
+        logger.info('[4/10] Building const_finder...')
         self.build_const_finder(arch=arch, mode='debug', jobs=jobs)
 
-        # Step 5: Build Android gen_snapshot (only arm64 supported)
+        # Step 5: Build Linux release (for flutter build linux)
+        logger.info('[5/10] Configuring Linux release...')
+        self.configure(arch=arch, mode='release')
+
+        logger.info('[6/10] Building Flutter engine (release)...')
+        self.build(arch=arch, mode='release', jobs=jobs)
+
+        # Step 7: Build Linux profile (for flutter run -d linux --profile)
+        logger.info('[7/10] Configuring Linux profile...')
+        self.configure(arch=arch, mode='profile')
+
+        logger.info('[8/10] Building Flutter engine (profile)...')
+        self.build(arch=arch, mode='profile', jobs=jobs)
+
+        # Step 9: Build Android gen_snapshot (only arm64 supported)
         # Due to Dart VM cross-compilation limitations, we can only build
         # gen_snapshot for android-arm64. android-arm and android-x64 require
         # patching the Dart VM signal handler code.
-        logger.info('[5/8] Building Android gen_snapshot release (arm64 only)...')
+        logger.info('[9/12] Building Android gen_snapshot release (arm64 only)...')
         self.configure_android(arch='arm64', mode='release')
         self.build_android_gen_snapshot(arch='arm64', mode='release', jobs=jobs)
 
-        # Step 6: Build Android gen_snapshot profile mode
-        logger.info('[6/8] Building Android gen_snapshot profile (arm64 only)...')
+        # Step 10: Build Android gen_snapshot profile mode
+        logger.info('[10/12] Building Android gen_snapshot profile (arm64 only)...')
         self.configure_android(arch='arm64', mode='profile')
         self.build_android_gen_snapshot(arch='arm64', mode='profile', jobs=jobs)
 
-        # Step 7: Package deb
-        logger.info('[7/8] Packaging deb...')
+        # Step 11: Package deb
+        logger.info('[11/12] Packaging deb...')
         self.debuild(arch=arch, output=self.output(arch))
 
-        logger.info('[8/8] Build complete!')
+        logger.info('[12/12] Build complete!')
         logger.info(f'Output: {self.output(arch)}')
         logger.info('Note: Users must use --target-platform android-arm64 when building APKs')
 
