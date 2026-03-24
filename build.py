@@ -557,33 +557,33 @@ class Build:
         logger.info('=== Starting complete Flutter Termux build ===')
 
         # Step 1: Build Linux debug (for flutter run -d linux --debug)
-        logger.info('[1/10] Configuring Linux debug...')
+        logger.info('[1/12] Configuring Linux debug...')
         self.configure(arch=arch, mode='debug')
 
-        logger.info('[2/10] Building Flutter engine + dart...')
+        logger.info('[2/12] Building Flutter engine + dart...')
         self.build(arch=arch, mode='debug', jobs=jobs)
         self.build_dart(arch=arch, mode='debug', jobs=jobs)
 
         # Step 3: Build impellerc (for shader compilation)
-        logger.info('[3/10] Building impellerc...')
+        logger.info('[3/12] Building impellerc...')
         self.build_impellerc(arch=arch, mode='debug', jobs=jobs)
 
         # Step 4: Build const_finder (for icon tree shaking)
-        logger.info('[4/10] Building const_finder...')
+        logger.info('[4/12] Building const_finder...')
         self.build_const_finder(arch=arch, mode='debug', jobs=jobs)
 
         # Step 5: Build Linux release (for flutter build linux)
-        logger.info('[5/10] Configuring Linux release...')
+        logger.info('[5/12] Configuring Linux release...')
         self.configure(arch=arch, mode='release')
 
-        logger.info('[6/10] Building Flutter engine (release)...')
+        logger.info('[6/12] Building Flutter engine (release)...')
         self.build(arch=arch, mode='release', jobs=jobs)
 
         # Step 7: Build Linux profile (for flutter run -d linux --profile)
-        logger.info('[7/10] Configuring Linux profile...')
+        logger.info('[7/12] Configuring Linux profile...')
         self.configure(arch=arch, mode='profile')
 
-        logger.info('[8/10] Building Flutter engine (profile)...')
+        logger.info('[8/12] Building Flutter engine (profile)...')
         self.build(arch=arch, mode='profile', jobs=jobs)
 
         # Step 9: Build Android gen_snapshot (only arm64 supported)
