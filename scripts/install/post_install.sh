@@ -134,6 +134,15 @@ exec /data/data/com.termux/files/usr/bin/clang++ -L\$LIB_PATH -L\$CLANG_LIB_ARCH
         fi
     fi
 
+    # Replace x86_64 llvm-objcopy/llvm-strip with Termux ARM64 native binaries
+    # (Gradle StripDebugSymbolsRunnable fails with x86_64 binaries on ARM64)
+    local LLVM_BIN="$PREBUILT/linux-x86_64/bin"
+    if [ -f /data/data/com.termux/files/usr/bin/llvm-objcopy ]; then
+        cp /data/data/com.termux/files/usr/bin/llvm-objcopy "$LLVM_BIN/llvm-objcopy" 2>/dev/null || true
+        cp /data/data/com.termux/files/usr/bin/llvm-strip "$LLVM_BIN/llvm-strip" 2>/dev/null || true
+        echo "    ✓ llvm-objcopy/llvm-strip replaced with ARM64 native"
+    fi
+
     echo "    ✓ NDK $NDK_NAME configured"
 }
 
@@ -177,6 +186,14 @@ if command -v termux-elf-cleaner &> /dev/null; then
     echo "  ✓ ELF binaries cleaned"
 else
     echo "  ⚠ termux-elf-cleaner not found, skipping"
+fi
+
+# Downgrade compileSdkVersion to 34 (Termux aapt2 2.19 cannot load android-35/36 android.jar)
+echo "[1.5/13] Downgrading compileSdkVersion to 34..."
+FLUTTER_EXT="$FLUTTER_ROOT/packages/flutter_tools/gradle/src/main/kotlin/FlutterExtension.kt"
+if [ -f "$FLUTTER_EXT" ]; then
+    sed -i 's/val compileSdkVersion: Int = [0-9]*/val compileSdkVersion: Int = 34/' "$FLUTTER_EXT"
+    echo "  ✓ compileSdkVersion set to 34"
 fi
 
 # 2. 下載並安裝 Android API 34 (aapt2 bug workaround)
