@@ -30,10 +30,11 @@ setup_ndk_clang_wrappers() {
     echo "    Setting up clang wrappers for NDK $NDK_NAME..."
 
     # Create wrapper script content (using NDK_PATH variable in script)
-CLANG_WRAPPER="#!/bin/sh
+CLANG_WRAPPER="#!/data/data/com.termux/files/usr/bin/sh
 NDK=$NDK_PATH
 SYSROOT=\$NDK/toolchains/llvm/prebuilt/linux-x86_64/sysroot
-CLANG_LIB=\$NDK/toolchains/llvm/prebuilt/linux-x86_64/lib/clang/18/lib/linux
+CLANG_VERSION=\$(ls -1 \$NDK/toolchains/llvm/prebuilt/linux-x86_64/lib/clang/ | tail -n 1)
+CLANG_LIB=\$NDK/toolchains/llvm/prebuilt/linux-x86_64/lib/clang/\$CLANG_VERSION/lib/linux
 
 ARCH=\"\"
 for arg in \"\$@\"; do
@@ -55,10 +56,11 @@ fi
 
 exec /data/data/com.termux/files/usr/bin/clang -L\$LIB_PATH -L\$CLANG_LIB_ARCH \"\$@\""
 
-CLANGPP_WRAPPER="#!/bin/sh
+CLANGPP_WRAPPER="#!/data/data/com.termux/files/usr/bin/sh
 NDK=$NDK_PATH
 SYSROOT=\$NDK/toolchains/llvm/prebuilt/linux-x86_64/sysroot
-CLANG_LIB=\$NDK/toolchains/llvm/prebuilt/linux-x86_64/lib/clang/18/lib/linux
+CLANG_VERSION=\$(ls -1 \$NDK/toolchains/llvm/prebuilt/linux-x86_64/lib/clang/ | tail -n 1)
+CLANG_LIB=\$NDK/toolchains/llvm/prebuilt/linux-x86_64/lib/clang/\$CLANG_VERSION/lib/linux
 
 ARCH=\"\"
 for arg in \"\$@\"; do
