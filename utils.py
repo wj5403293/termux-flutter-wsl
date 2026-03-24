@@ -6,7 +6,7 @@ from loguru import logger
 from functools import wraps
 
 __ARCH__ = dict(arm='arm', arm64='aarch64', x64='x86_64', x86='i686')
-__MODE__ = ('release', 'debug', 'profile')
+__MODE__ = ('debug', 'release', 'profile')
 
 if os.environ.get('PREFIX') == '/data/data/com.termux/files/usr':
     __TERMUX__ = 'true'
