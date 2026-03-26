@@ -199,6 +199,14 @@ resource:
       - $out/flutter_sdk.stamp
       - $out/font-subset.stamp
       - $out/linux-sdk.stamp
+      # Android stamps: prevent Flutter from downloading x64 tools
+      # All combos needed even though only arm64 gen_snapshot exists
+      - $out/android-arm-release.stamp
+      - $out/android-arm-profile.stamp
+      - $out/android-arm64-release.stamp
+      - $out/android-arm64-profile.stamp
+      - $out/android-x64-release.stamp
+      - $out/android-x64-profile.stamp
     binary: true
     define:
       out: *cache

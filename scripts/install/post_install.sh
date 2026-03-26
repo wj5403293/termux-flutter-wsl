@@ -249,6 +249,32 @@ object FlutterPluginConstants {
 EOF
 echo "  ✓ FlutterPluginConstants.kt updated"
 
+# 3b. Patch Flutter CLI to default to android-arm64 only
+# Without this, `flutter build apk` tries to compile for arm, arm64, and x64,
+# but we only have gen_snapshot for arm64
+echo "[3.5/13] Patching Flutter CLI for ARM64-only APK builds..."
+FLUTTER_TOOLS="$FLUTTER_ROOT/packages/flutter_tools/lib/src/commands"
+
+# build_apk.dart: change default architectures
+if [ -f "$FLUTTER_TOOLS/build_apk.dart" ]; then
+    # Replace the JIT and AOT default arch lists
+    sed -i "s/static const _kDefaultJitArchs = <String>\['android-arm', 'android-arm64', 'android-x64'\]/static const _kDefaultJitArchs = <String>['android-arm64']/" "$FLUTTER_TOOLS/build_apk.dart"
+    sed -i "s/static const _kDefaultAotArchs = <String>\['android-arm', 'android-arm64', 'android-x64'\]/static const _kDefaultAotArchs = <String>['android-arm64']/" "$FLUTTER_TOOLS/build_apk.dart"
+    echo "  ✓ build_apk.dart patched"
+fi
+
+# build_aar.dart: change default target-platform
+if [ -f "$FLUTTER_TOOLS/build_aar.dart" ]; then
+    sed -i "s/defaultsTo: <String>\['android-arm', 'android-arm64', 'android-x64'\]/defaultsTo: <String>['android-arm64']/" "$FLUTTER_TOOLS/build_aar.dart"
+    echo "  ✓ build_aar.dart patched"
+fi
+
+# build_appbundle.dart: change default target-platform
+if [ -f "$FLUTTER_TOOLS/build_appbundle.dart" ]; then
+    sed -i "s/defaultsTo: <String>\['android-arm', 'android-arm64', 'android-x64'\]/defaultsTo: <String>['android-arm64']/" "$FLUTTER_TOOLS/build_appbundle.dart"
+    echo "  ✓ build_appbundle.dart patched"
+fi
+
 # 3. 創建 NDK clang wrappers (處理所有已安裝的 NDK 版本)
 echo "[4/13] Creating NDK clang wrappers..."
 
