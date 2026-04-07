@@ -52,7 +52,7 @@ resource:
   # dart binary for running flutter commands
   # Use debug mode dart as it has compatible snapshot flags
   dart_bin:
-    source: $debug/dart
+    source: $debug/exe.unstripped/dart
     output: $out/dart-sdk/bin/dart
     define:
       debug: output.debug
@@ -75,6 +75,16 @@ resource:
       any: *any
       out: *cache
     mode: 0o755
+
+  # dartdev AOT snapshot required for pub get, flutter create, etc.
+  # Only exists in release build output (debug build has JIT-only snapshots)
+  dartdev_aot:
+    source: $release/dartdev_aot.dart.snapshot
+    output: $out/dart-sdk/bin/snapshots/dartdev_aot.dart.snapshot
+    define:
+      release: output.release
+      out: *cache
+    mode: 0o644
 
   # frontend_server_aot snapshot for AOT compilation
   # Use product mode snapshot to work with dartaotruntime_product

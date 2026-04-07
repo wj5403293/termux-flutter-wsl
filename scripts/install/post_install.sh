@@ -126,11 +126,23 @@ exec /data/data/com.termux/files/usr/bin/clang++ -L\$LIB_PATH -L\$CLANG_LIB_ARCH
     # Create sysroot symlink
     ln -sf linux-x86_64/sysroot "$PREBUILT/sysroot" 2>/dev/null || true
 
-    # Patch toolchain cmake if exists
+    # Patch toolchain cmake: skip compiler test and force ANDROID_HOST_TAG
+    # Termux clang wrapper hangs on CMake compiler ID test, and host tag detection
+    # returns empty string on Termux, causing sysroot path: prebuilt//sysroot
     local TOOLCHAIN="$NDK_PATH/build/cmake/android-legacy.toolchain.cmake"
     if [ -f "$TOOLCHAIN" ]; then
         if grep -q 'list(APPEND ANDROID_LINKER_FLAGS "-static-libstdc++")' "$TOOLCHAIN" 2>/dev/null; then
             sed -i 's/list(APPEND ANDROID_LINKER_FLAGS "-static-libstdc++")/# Disabled for Termux: list(APPEND ANDROID_LINKER_FLAGS "-static-libstdc++")/' "$TOOLCHAIN"
+        fi
+        if ! grep -q 'CMAKE_C_COMPILER_WORKS' "$TOOLCHAIN" 2>/dev/null; then
+            sed -i '1a set(ANDROID_HOST_TAG "linux-x86_64")\nset(CMAKE_C_COMPILER_WORKS TRUE)\nset(CMAKE_CXX_COMPILER_WORKS TRUE)' "$TOOLCHAIN"
+        fi
+    fi
+    # Also patch the main android.toolchain.cmake
+    local MAIN_TOOLCHAIN="$NDK_PATH/build/cmake/android.toolchain.cmake"
+    if [ -f "$MAIN_TOOLCHAIN" ]; then
+        if ! grep -q 'CMAKE_C_COMPILER_WORKS' "$MAIN_TOOLCHAIN" 2>/dev/null; then
+            sed -i '1a set(ANDROID_HOST_TAG "linux-x86_64")\nset(CMAKE_C_COMPILER_WORKS TRUE)\nset(CMAKE_CXX_COMPILER_WORKS TRUE)' "$MAIN_TOOLCHAIN"
         fi
     fi
 
@@ -186,6 +198,118 @@ if command -v termux-elf-cleaner &> /dev/null; then
     echo "  ✓ ELF binaries cleaned"
 else
     echo "  ⚠ termux-elf-cleaner not found, skipping"
+fi
+
+# 1.5a. Fix shebangs in Flutter SDK scripts
+# Gradle and other processes may invoke flutter/dart scripts which have #!/usr/bin/env bash
+# This fails on Termux since /usr/bin/env doesn't exist
+echo "[1.5a/13] Fixing shebangs in Flutter SDK scripts..."
+TERMUX_BASH=/data/data/com.termux/files/usr/bin/bash
+TERMUX_SH=/data/data/com.termux/files/usr/bin/sh
+for f in $FLUTTER_ROOT/bin/flutter $FLUTTER_ROOT/bin/dart $FLUTTER_ROOT/bin/internal/shared.sh $FLUTTER_ROOT/bin/internal/update_dart_sdk.sh $FLUTTER_ROOT/bin/internal/content_aware_hash.sh $FLUTTER_ROOT/bin/internal/last_engine_commit.sh $FLUTTER_ROOT/bin/internal/update_engine_version.sh; do
+    if [ -f "$f" ]; then
+        sed -i "1s|#!/usr/bin/env bash|#!$TERMUX_BASH|" "$f"
+        sed -i "1s|#!/usr/bin/env sh|#!$TERMUX_SH|" "$f"
+    fi
+done
+echo "  ✓ Shebangs fixed"
+
+# 1.5b. Fix engine.stamp and engine.realm (required for Maven artifact resolution)
+echo "[1.5b/13] Fixing engine.stamp and engine.realm, and injecting framework version tag..."
+cp $FLUTTER_ROOT/bin/internal/engine.version $FLUTTER_ROOT/bin/cache/engine.stamp 2>/dev/null || true
+echo -n > $FLUTTER_ROOT/bin/cache/engine.realm 2>/dev/null || true
+echo "  ✓ engine.stamp=$(cat $FLUTTER_ROOT/bin/cache/engine.stamp)"
+echo "  ✓ engine.realm cleared"
+
+if ! [ -d "$FLUTTER_ROOT/.git" ]; then
+    echo "  ! Missing .git, creating dummy repository for version resolution..."
+    cd "$FLUTTER_ROOT" || true
+    rm -f version
+    /data/data/com.termux/files/usr/bin/git init -q >/dev/null 2>&1 || true
+    /data/data/com.termux/files/usr/bin/git config user.email "termux@example.com" >/dev/null 2>&1 || true
+    /data/data/com.termux/files/usr/bin/git config user.name "termux" >/dev/null 2>&1 || true
+    /data/data/com.termux/files/usr/bin/git add bin/flutter >/dev/null 2>&1 || true
+    /data/data/com.termux/files/usr/bin/git commit -q -m "Init framework" >/dev/null 2>&1 || true
+    /data/data/com.termux/files/usr/bin/git tag "3.41.5" >/dev/null 2>&1 || true
+    rm -f bin/cache/flutter.version.json 2>/dev/null || true
+    echo "  ✓ Dummy tag 3.41.5 created"
+fi
+
+# 1.5c. Fix CMakeLists.txt (skip compiler test for NDK cmake)
+# CMAKE_C_COMPILER_WORKS=TRUE skips the compiler test that fails on ARM64
+echo "[1.5c/13] Fixing CMakeLists.txt for ARM64 compatibility..."
+CMAKE_FILE=$FLUTTER_ROOT/packages/flutter_tools/gradle/src/main/scripts/CMakeLists.txt
+cat > "$CMAKE_FILE" << 'CMAKEOF'
+cmake_minimum_required(VERSION 3.6)
+set(CMAKE_C_COMPILER_WORKS TRUE)
+set(CMAKE_CXX_COMPILER_WORKS TRUE)
+project(FlutterNDKTrick C CXX)
+CMAKEOF
+echo "  ✓ CMakeLists.txt fixed (compiler test skipped)"
+
+# 1.5d. Install Android SDK Platform 36 (Flutter 3.41.5 requirement)
+echo "[1.5d/13] Installing Android SDK Platform 36..."
+if [ ! -d "$ANDROID_SDK/platforms/android-36" ]; then
+    mkdir -p $ANDROID_SDK/platforms
+    cd $ANDROID_SDK/platforms
+    curl -L -o platform-36.zip 'https://dl.google.com/android/repository/platform-36_r01.zip' 2>/dev/null
+    if [ -f platform-36.zip ] && [ -s platform-36.zip ]; then
+        unzip -q platform-36.zip 2>/dev/null
+        rm -f platform-36.zip
+        echo "  ✓ Platform 36 installed"
+    else
+        echo "  ⚠ Download failed, symlink platform-34 → android-36"
+        ln -sf android-34 android-36 2>/dev/null
+    fi
+else
+    echo "  ✓ Platform 36 already exists"
+fi
+
+# Replace .deb dart binary with Termux system dart (JIT VM)
+# The .deb ships exe.unstripped/dart which is actually dartdev (AOT wrapper)
+# that cannot execute .dart files in JIT mode. The flutter CLI (shared.sh)
+# needs a full JIT-capable dart VM to run flutter_tools.dart directly.
+echo "[1.5e/13] Replacing dart with Termux JIT-capable dart..."
+SYSTEM_DART=/data/data/com.termux/files/usr/bin/dart
+DEB_DART=$DART_SDK/bin/dart
+
+if ! command -v dart &> /dev/null; then
+    echo "  ! Termux dart not found. Installing dart via apt..."
+    apt update >/dev/null 2>&1 || true
+    apt install -y dart >/dev/null 2>&1 || true
+fi
+
+if ! command -v aapt2 &> /dev/null; then
+    echo "  ! Termux aapt2 not found. Installing build dependencies via apt..."
+    apt update >/dev/null 2>&1 || true
+    apt install -y aapt2 libc++ libexpat openssl >/dev/null 2>&1 || true
+fi
+
+if [ -f "$SYSTEM_DART" ]; then
+    cp "$SYSTEM_DART" "$DEB_DART"
+    chmod 755 "$DEB_DART"
+    echo "  ✓ Replaced with system dart ($($DEB_DART --version 2>&1))"
+else
+    echo "  ⚠ Keeping shipped dart wrapper."
+fi
+
+# Generate package_config.json for flutter_tools
+# The flutter CLI runs flutter_tools.dart in JIT mode (see shared.sh line ~200)
+# and requires .dart_tool/package_config.json from pub get.
+echo "[1.5f/13] Generating flutter_tools package_config.json..."
+FLUTTER_TOOLS_DIR=$FLUTTER_ROOT/packages/flutter_tools
+PKG_CONFIG=$FLUTTER_TOOLS_DIR/.dart_tool/package_config.json
+if [ ! -f "$PKG_CONFIG" ]; then
+    echo "  Running pub get for flutter_tools..."
+    cd "$FLUTTER_TOOLS_DIR"
+    $DART_SDK/bin/dart pub get --suppress-analytics 2>/dev/null
+    if [ -f "$PKG_CONFIG" ]; then
+        echo "  ✓ package_config.json generated"
+    else
+        echo "  ✗ Failed to generate package_config.json!"
+    fi
+else
+    echo "  ✓ package_config.json already exists"
 fi
 
 # Downgrade compileSdkVersion to 34 (Termux aapt2 2.19 cannot load android-35/36 android.jar)
@@ -273,6 +397,24 @@ fi
 if [ -f "$FLUTTER_TOOLS/build_appbundle.dart" ]; then
     sed -i "s/defaultsTo: <String>\['android-arm', 'android-arm64', 'android-x64'\]/defaultsTo: <String>['android-arm64']/" "$FLUTTER_TOOLS/build_appbundle.dart"
     echo "  ✓ build_appbundle.dart patched"
+fi
+
+# 3c. Disable forceNdkDownload() in Flutter Gradle plugin
+# On Termux, NDK is manually installed. The AGP CMake trick that forces NDK download
+# triggers a CMake compiler test that fails because Termux ARM64 clang wrappers
+# don't support NDK's --resource-dir flag format.
+# Fix: Make forceNdkDownload() early return, skipping the CMake configuration entirely.
+echo "[3.7/13] Disabling forceNdkDownload CMake trick..."
+PLUGIN_UTILS="$FLUTTER_ROOT/packages/flutter_tools/gradle/src/main/kotlin/FlutterPluginUtils.kt"
+if [ -f "$PLUGIN_UTILS" ]; then
+    if ! grep -q "return // Termux: NDK already installed" "$PLUGIN_UTILS" 2>/dev/null; then
+        sed -i '/fun forceNdkDownload/,/^    }/ {
+            /val forcingNotRequired: Boolean/i\        return // Termux: NDK already installed, skip CMake trick
+        }' "$PLUGIN_UTILS"
+        echo "  ✓ forceNdkDownload() patched to early return"
+    else
+        echo "  ✓ forceNdkDownload() already patched"
+    fi
 fi
 
 # 3. 創建 NDK clang wrappers (處理所有已安裝的 NDK 版本)
@@ -397,6 +539,25 @@ else
     echo "  ✓ VM snapshots present"
 fi
 
+# 12. Create linux-x64 -> linux-arm64 symlinks for host platform detection
+# Flutter's getCurrentHostPlatform() in build_info.dart doesn't recognize
+# Termux as Linux (Platform.operatingSystem returns 'android'), so it falls
+# back to HostPlatform.linux_x64, causing gen_snapshot lookup to search
+# linux-x64/ instead of linux-arm64/. Create symlinks to resolve this.
+echo "[12.5/13] Creating host platform symlinks..."
+ENG_ART=$FLUTTER_ROOT/bin/cache/artifacts/engine
+for dir in android-arm64-release android-arm64-profile; do
+    if [ -d "$ENG_ART/$dir/linux-arm64" ] && [ ! -e "$ENG_ART/$dir/linux-x64" ]; then
+        ln -sf linux-arm64 "$ENG_ART/$dir/linux-x64"
+        echo "  ✓ $dir/linux-x64 -> linux-arm64"
+    fi
+done
+# Also create top-level linux-x64 -> linux-arm64 symlink for general artifacts
+if [ -d "$ENG_ART/linux-arm64" ] && [ ! -e "$ENG_ART/linux-x64" ]; then
+    ln -sf linux-arm64 "$ENG_ART/linux-x64"
+    echo "  ✓ linux-x64 -> linux-arm64"
+fi
+
 echo ""
 echo "=========================================="
 echo "Post-install configuration complete!"
@@ -405,29 +566,22 @@ echo ""
 echo "=== Quick Start ==="
 echo "  source /data/data/com.termux/files/usr/etc/profile.d/flutter.sh"
 echo "  flutter create myapp && cd myapp"
-echo "  flutter build apk --release"
 echo ""
-echo "=== Project Setup (for each Flutter project) ==="
-echo "  Edit android/app/build.gradle.kts:"
-echo "    compileSdk = 34"
-echo "    targetSdk = 34"
-echo "    ndk { abiFilters += listOf(\"arm64-v8a\") }"
+echo "=== IMPORTANT: Project Setup (REQUIRED for each Flutter project) ==="
+echo "  1. Fix gradlew shebang:"
+echo "     sed -i '1s|#!/usr/bin/env bash|#!/data/data/com.termux/files/usr/bin/bash|' android/gradlew"
 echo ""
-echo "  Add to android/gradle.properties:"
-echo "    android.aapt2FromMavenOverride=/data/data/com.termux/files/usr/bin/aapt2"
+echo "  2. Edit android/app/build.gradle.kts:"
+echo "     compileSdk = 34"
+echo "     targetSdk = 34"
+echo "     ndk { abiFilters += listOf(\"arm64-v8a\") }"
 echo ""
-echo "=== Hot Reload on Device (flutter run) ==="
-echo "  1. Enable Wireless Debugging:"
-echo "     Settings → Developer Options → Wireless Debugging → ON"
+echo "  3. Add to android/gradle.properties:"
+echo "     android.aapt2FromMavenOverride=/data/data/com.termux/files/usr/bin/aapt2"
 echo ""
-echo "  2. Pair device (one-time):"
-echo "     Click 'Pair device with pairing code'"
-echo "     adb pair 127.0.0.1:<PAIR_PORT> <PAIRING_CODE>"
+echo "  4. Set JAVA_HOME before building:"
+echo "     export JAVA_HOME=\$(find /data/data/com.termux/files/usr/lib/jvm -maxdepth 1 -type d -name 'java-*-openjdk' | sort -V | tail -1)"
 echo ""
-echo "  3. Connect:"
-echo "     adb connect 127.0.0.1:<CONNECT_PORT>"
-echo "     (Use the port shown on Wireless Debugging page, not pairing port)"
-echo ""
-echo "  4. Run:"
-echo "     flutter run"
+echo "  5. Build:"
+echo "     flutter build apk --release --target-platform android-arm64"
 echo ""
