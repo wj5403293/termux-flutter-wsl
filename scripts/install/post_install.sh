@@ -285,6 +285,14 @@ if ! command -v aapt2 &> /dev/null; then
     apt install -y aapt2 libc++ libexpat openssl >/dev/null 2>&1 || true
 fi
 
+# Install d8/aidl/apksigner (required by AGP for build-tools validation)
+for tool in d8 dx aidl apksigner zipalign; do
+    if ! command -v $tool &> /dev/null; then
+        echo "  ! $tool not found, installing..."
+        apt install -y $tool >/dev/null 2>&1 || true
+    fi
+done
+
 if [ -f "$SYSTEM_DART" ]; then
     cp "$SYSTEM_DART" "$DEB_DART"
     chmod 755 "$DEB_DART"
@@ -485,8 +493,33 @@ echo "[8/13] Creating build-tools symlinks..."
 BT_DIR=$ANDROID_SDK/build-tools
 mkdir -p "$BT_DIR"
 
-# Setup default version first
+# If a real build-tools version exists (e.g. 35.0.0-2 from Termux),
+# copy it as 35.0.0 so AGP can validate it (AGP rejects versions like 35.0.0-2)
+BT_REAL=""
+for bt in "$BT_DIR"/*/; do
+    if [ -f "$bt/package.xml" ]; then
+        BT_REAL="$bt"
+        break
+    fi
+done
+
+if [ -n "$BT_REAL" ] && [ ! -f "$BT_DIR/35.0.0/package.xml" ]; then
+    echo "  Cloning $(basename $BT_REAL) -> 35.0.0 (for AGP validation)..."
+    rm -rf "$BT_DIR/35.0.0"
+    cp -a "$BT_REAL" "$BT_DIR/35.0.0"
+    # Fix version strings in metadata
+    BT_REAL_NAME=$(basename "$BT_REAL")
+    sed -i "s/$BT_REAL_NAME/35.0.0/g" "$BT_DIR/35.0.0/source.properties" 2>/dev/null || true
+    sed -i "s/$BT_REAL_NAME/35.0.0/g" "$BT_DIR/35.0.0/package.xml" 2>/dev/null || true
+fi
+
+# Setup default version
 setup_build_tools_symlinks "$BT_DIR/35.0.0"
+
+# Create source.properties if missing (required by AGP)
+if [ ! -f "$BT_DIR/35.0.0/source.properties" ]; then
+    printf "Pkg.Revision=35.0.0\nPkg.Path=build-tools;35.0.0\nPkg.Desc=Android SDK Build-Tools 35\n" > "$BT_DIR/35.0.0/source.properties"
+fi
 
 # Also setup any other versions Gradle may have downloaded
 for bt_path in "$BT_DIR"/*; do
@@ -528,6 +561,11 @@ echo -e "\n24333f8a63b6825ea9c5514f83c2829b004d1fee" > $ANDROID_SDK/licenses/and
 echo -e "\n84831b9409646a918e30573bab4c9c91346d8abd" > $ANDROID_SDK/licenses/android-sdk-preview-license
 echo "  ✓ Android licenses accepted"
 
+# 10.5. Configure ANDROID_HOME in flutter config
+echo "[11.5/13] Setting Android SDK path in Flutter config..."
+$FLUTTER_ROOT/bin/flutter config --android-sdk $ANDROID_SDK --suppress-analytics 2>/dev/null || true
+echo "  ✓ ANDROID_HOME=$ANDROID_SDK"
+
 # 11. 複製 VM snapshots (for debug mode)
 echo "[12/13] Checking engine artifacts..."
 ENGINE_DIR=$FLUTTER_ROOT/bin/cache/artifacts/engine/linux-arm64
@@ -558,6 +596,69 @@ if [ -d "$ENG_ART/linux-arm64" ] && [ ! -e "$ENG_ART/linux-x64" ]; then
     echo "  ✓ linux-x64 -> linux-arm64"
 fi
 
+# 12.7a. Patch flutter build linux to work on Termux
+# Dart's Platform.operatingSystem returns 'android' on Termux, but uname -s returns 'Linux'.
+# Patch build_linux.dart to skip the platform check so linux desktop builds work.
+echo "[12.7a/13] Patching flutter build linux for Termux..."
+BUILD_LINUX="$FLUTTER_ROOT/packages/flutter_tools/lib/src/commands/build_linux.dart"
+if [ -f "$BUILD_LINUX" ]; then
+    if ! grep -q 'Termux: allow linux build' "$BUILD_LINUX" 2>/dev/null; then
+        # Comment out the isLinux check (line: if (!globals.platform.isLinux))
+        sed -i "s|if (!globals.platform.isLinux)|if (false /\* Termux: allow linux build \*/)|" "$BUILD_LINUX"
+        # Also unhide the command on Termux
+        sed -i "s|!featureFlags.isLinuxEnabled || !globals.platform.isLinux|!featureFlags.isLinuxEnabled /\* Termux: visible \*/|" "$BUILD_LINUX"
+        echo "  ✓ build_linux.dart patched"
+    else
+        echo "  ✓ Already patched"
+    fi
+else
+    echo "  ⚠ build_linux.dart not found"
+fi
+
+# 12.7b. Fix tool_backend.sh shebang for Termux
+# CMake invokes this via shebang, and #!/usr/bin/env bash doesn't work on Termux
+echo "[12.7b/13] Fixing tool_backend.sh shebang..."
+TOOL_BACKEND="$FLUTTER_ROOT/packages/flutter_tools/bin/tool_backend.sh"
+if [ -f "$TOOL_BACKEND" ]; then
+    sed -i '1s|#!/usr/bin/env bash|#!/data/data/com.termux/files/usr/bin/bash|' "$TOOL_BACKEND"
+    echo "  ✓ tool_backend.sh shebang fixed"
+fi
+
+# 12.7c. Create api-level.h for CMake system detection
+# CMake's CMakeDetermineSystem.cmake reads $PREFIX/include/android/api-level.h
+# Without this file, cmake fails with "file failed to open for reading"
+echo "[12.7c/13] Creating api-level.h for CMake..."
+mkdir -p "$PREFIX/include/android" 2>/dev/null
+if [ ! -f "$PREFIX/include/android/api-level.h" ]; then
+    cat > "$PREFIX/include/android/api-level.h" << 'HEADER'
+#ifndef __ANDROID_API_LEVEL_H__
+#define __ANDROID_API_LEVEL_H__
+#define __ANDROID_API__ 35
+#endif
+HEADER
+    echo "  ✓ api-level.h created"
+else
+    echo "  ✓ api-level.h already exists"
+fi
+
+# 12.7. Disable icon tree shaking (const_finder not available on ARM64)
+# The Termux JIT dart cannot run kernel snapshots (const_finder.dart.snapshot),
+# and the engine's dartaotruntime can't run them either.
+# Patch the icon_tree_shaker to always skip, equivalent to --no-tree-shake-icons.
+echo "[12.7/13] Disabling icon tree shaking (const_finder unavailable)..."
+ICON_SHAKER="$FLUTTER_ROOT/packages/flutter_tools/lib/src/build_system/targets/icon_tree_shaker.dart"
+if [ -f "$ICON_SHAKER" ]; then
+    if ! grep -q 'Termux: const_finder unavailable' "$ICON_SHAKER" 2>/dev/null; then
+        # Replace the tree-shake flag check with false in both locations
+        sed -i "s|_environment.defines\[kIconTreeShakerFlag\] == 'true'|false /\* Termux: const_finder unavailable \*/|g" "$ICON_SHAKER"
+        echo "  ✓ Icon tree shaking disabled"
+    else
+        echo "  ✓ Already disabled"
+    fi
+else
+    echo "  ⚠ icon_tree_shaker.dart not found"
+fi
+
 echo ""
 echo "=========================================="
 echo "Post-install configuration complete!"
@@ -582,6 +683,21 @@ echo ""
 echo "  4. Set JAVA_HOME before building:"
 echo "     export JAVA_HOME=\$(find /data/data/com.termux/files/usr/lib/jvm -maxdepth 1 -type d -name 'java-*-openjdk' | sort -V | tail -1)"
 echo ""
-echo "  5. Build:"
+echo ""
+echo "  5. Build APK:"
 echo "     flutter build apk --release --target-platform android-arm64"
+echo ""
+echo "=== Linux Desktop Build (optional) ==="
+echo "  1. Add to linux/CMakeLists.txt (first line, before cmake_minimum_required):"
+echo "     set(CMAKE_SYSTEM_NAME Linux)"
+echo ""
+echo "  2. Build:"
+echo "     flutter build linux --release"
+echo ""
+echo "=== Flutter Run (hot reload on device) ==="
+echo "  1. Install android-tools:  pkg install android-tools"
+echo "  2. Enable ADB TCP (from PC):  adb tcpip 5555"
+echo "  3. Connect in Termux:  adb connect localhost:5555"
+echo "     (Accept the 'Allow USB debugging?' dialog on screen)"
+echo "  4. Run:  flutter run -d emulator-5554"
 echo ""
