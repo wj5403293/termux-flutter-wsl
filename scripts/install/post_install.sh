@@ -607,7 +607,12 @@ if [ -f "$BUILD_LINUX" ]; then
         sed -i "s|if (!globals.platform.isLinux)|if (false /\* Termux: allow linux build \*/)|" "$BUILD_LINUX"
         # Also unhide the command on Termux
         sed -i "s|!featureFlags.isLinuxEnabled || !globals.platform.isLinux|!featureFlags.isLinuxEnabled /\* Termux: visible \*/|" "$BUILD_LINUX"
-        echo "  ✓ build_linux.dart patched"
+        
+        # NOTE: MUST DELETE SNAPSHOT AND STAMP TO FORCE REBUILD!
+        rm -f "$FLUTTER_ROOT/bin/cache/flutter_tools.stamp" 2>/dev/null
+        rm -f "$FLUTTER_ROOT/bin/cache/flutter_tools.snapshot" 2>/dev/null
+        
+        echo "  ✓ build_linux.dart patched (forced flutter_tools rebuild)"
     else
         echo "  ✓ Already patched"
     fi
