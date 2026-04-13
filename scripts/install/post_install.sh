@@ -604,9 +604,9 @@ BUILD_LINUX="$FLUTTER_ROOT/packages/flutter_tools/lib/src/commands/build_linux.d
 if [ -f "$BUILD_LINUX" ]; then
     if ! grep -q 'Termux: allow linux build' "$BUILD_LINUX" 2>/dev/null; then
         # Comment out the isLinux check (line: if (!globals.platform.isLinux))
-        sed -i "s|if (!globals.platform.isLinux)|if (false /\* Termux: allow linux build \*/)|" "$BUILD_LINUX"
+        sed -i "s@if (!globals.platform.isLinux)@if (false /\* Termux: allow linux build \*/)@" "$BUILD_LINUX"
         # Also unhide the command on Termux
-        sed -i "s|!featureFlags.isLinuxEnabled || !globals.platform.isLinux|!featureFlags.isLinuxEnabled /\* Termux: visible \*/|" "$BUILD_LINUX"
+        sed -i "s@!featureFlags.isLinuxEnabled || !globals.platform.isLinux@!featureFlags.isLinuxEnabled /\* Termux: visible \*/@" "$BUILD_LINUX"
         
         # NOTE: MUST DELETE SNAPSHOT AND STAMP TO FORCE REBUILD!
         rm -f "$FLUTTER_ROOT/bin/cache/flutter_tools.stamp" 2>/dev/null

@@ -491,7 +491,18 @@ class Build:
         for p in paths:
             src = f"{wsl_mount}/{p}"
             dst = f"{wsl_root}/{p}"
-            cmd = f"cp -r {src} {dst}"
+            # Ensure dst exists
+            if is_wsl:
+                subprocess.run(['bash', '-c', f"mkdir -p {dst}"], check=False)
+            else:
+                subprocess.run(['wsl', '-e', 'bash', '-c', f"mkdir -p {dst}"], check=False)
+                
+            if '.' in p.split('/')[-1] and not src.endswith('/'):
+                 # It's a file
+                 cmd = f"cp -a {src} {dst}"
+            else:
+                 # It's a directory
+                 cmd = f"cp -a {src}/. {dst}/"
             logger.info(f'Syncing: {p}')
             if is_wsl:
                 # Running in WSL, execute directly
