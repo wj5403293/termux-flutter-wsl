@@ -88,3 +88,34 @@ nul
 # ----- 敏感文件 -----
 devices.md
 .claude/
+
+# ----- 臨時開發腳本 -----
+fix_*.sh
+test_*.sh
+check_*.sh
+wsl_*.sh
+e2e_*.sh
+run_*.sh
+build_*.sh
+!build.py
+gradle_*.sh
+strace_*.sh
+copy_*.sh
+setup_*.sh
+device_*.sh
+find_*.sh
+patch.sh
+install.sh
+run.sh
+full_e2e.sh
+clean_e2e_test.sh
+
+# ----- 臨時二進制 / snapshot -----
+*.snapshot
+*.apk
+*.b64
+gen_snapshot_*
+temp_*.*
+
+# ----- 臨時 PowerShell 腳本 -----
+*.ps1
