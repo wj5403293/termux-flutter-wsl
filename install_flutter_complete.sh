@@ -27,7 +27,7 @@ CYAN='\033[0;36m'
 NC='\033[0m'
 
 # 版本配置
-FLUTTER_VERSION="3.35.0"
+FLUTTER_VERSION="3.41.5"
 NDK_VERSION="27.1.12297006"
 REPO_BASE="https://raw.githubusercontent.com/ImL1s/termux-flutter-wsl/master"
 
@@ -116,7 +116,7 @@ for pkg in d8 dx aidl apksigner googletest android-tools; do
 done
 
 # 下載 Flutter deb
-FLUTTER_DEB_URL="https://github.com/ImL1s/termux-flutter-wsl/releases/download/${FLUTTER_VERSION}/flutter_${FLUTTER_VERSION}_aarch64.deb"
+FLUTTER_DEB_URL="https://github.com/ImL1s/termux-flutter-wsl/releases/download/v${FLUTTER_VERSION}/flutter_${FLUTTER_VERSION}_aarch64.deb"
 FLUTTER_DEB="$HOME/flutter_${FLUTTER_VERSION}_aarch64.deb"
 
 if [ ! -f "$FLUTTER_DEB" ]; then

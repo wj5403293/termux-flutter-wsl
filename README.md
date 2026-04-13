@@ -240,7 +240,7 @@ flutter doctor
 pkg update && pkg install x11-repo wget openjdk-21
 
 # 2. 下載安裝包
-wget https://github.com/ImL1s/termux-flutter-wsl/releases/download/3.41.5/flutter_3.41.5_aarch64.deb
+wget https://github.com/ImL1s/termux-flutter-wsl/releases/download/v3.41.5/flutter_3.41.5_aarch64.deb
 
 # 3. 安裝
 dpkg -i flutter_3.41.5_aarch64.deb

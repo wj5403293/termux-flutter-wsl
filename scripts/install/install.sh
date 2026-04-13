@@ -4,8 +4,8 @@
 
 set -e
 
-FLUTTER_VERSION="3.35.0"
-DEB_URL="https://github.com/ImL1s/termux-flutter-wsl/releases/download/${FLUTTER_VERSION}/flutter_${FLUTTER_VERSION}_aarch64.deb"
+FLUTTER_VERSION="3.41.5"
+DEB_URL="https://github.com/ImL1s/termux-flutter-wsl/releases/download/v${FLUTTER_VERSION}/flutter_${FLUTTER_VERSION}_aarch64.deb"
 
 echo "========================================"
 echo "Flutter ${FLUTTER_VERSION} for Termux ARM64"

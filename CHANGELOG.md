@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.41.5-termux-2] - 2026-04-13
+
+### Fixed
+- **`flutter build linux` on device**: `post_install.sh` sed command used `|` delimiter which collided with `||` in Dart source code, silently failing. Changed to `@` delimiter
+- **`build.py` sync duplicating directories**: `cp -r` caused nested `scripts/scripts/` dirs. Fixed to use `cp -a {src}/. {dst}/`
+- **flutter_tools snapshot not rebuilt**: Added `rm -f flutter_tools.stamp` and `rm -f flutter_tools.snapshot` after patching `build_linux.dart` to force Dart VM to pick up changes
+
+### Added
+- `UPGRADE_GUIDE.md` — complete step-by-step guide for upgrading to new Flutter versions
+- `.gitignore` patterns for temp scripts (`fix_*.sh`, `test_*.sh`, etc.)
+- E2E test script `gh_e2e_test.sh` for automated clean-install verification from GitHub Release
+
+### Verified (E2E from GitHub Release)
+- Download .deb → dpkg install → post_install.sh → flutter create → build apk → build linux: **ALL PASS**
+
+---
+
 ## [3.41.5-termux] - 2026-03-25
 
 ### Added
@@ -70,4 +87,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Upgrading
 
-See [BUILD_GUIDE.md](BUILD_GUIDE.md#upgrading-flutter-version) for upgrade instructions.
+See [UPGRADE_GUIDE.md](UPGRADE_GUIDE.md) for upgrade instructions.

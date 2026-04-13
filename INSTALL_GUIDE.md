@@ -41,8 +41,8 @@ pkg install -y openjdk-21 git wget curl unzip aapt2
 
 ```bash
 cd ~
-wget https://github.com/ImL1s/termux-flutter-wsl/releases/download/v3.35.0/flutter_3.35.0_aarch64.deb
-dpkg -i flutter_3.35.0_aarch64.deb
+wget https://github.com/ImL1s/termux-flutter-wsl/releases/download/v3.41.5/flutter_3.41.5_aarch64.deb
+dpkg -i flutter_3.41.5_aarch64.deb
 ```
 
 ### 步驟 3：安裝 Android SDK
