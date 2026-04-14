@@ -462,7 +462,7 @@ class Build:
         logger.warning('gen_snapshot not found at expected paths')
         return None
 
-    def sync(self):
+    def sync_windows_to_wsl(self):
         """Sync files from Windows to WSL before debuild.
 
         This prevents the common issue of editing files on Windows
@@ -472,6 +472,18 @@ class Build:
 
         if not self.sync_cfg:
             logger.debug('No sync config, skipping')
+            return
+
+        system = platform.system()
+        is_windows = system == 'Windows'
+        is_wsl = system == 'Linux' and (
+            'microsoft' in platform.release().lower() or
+            bool(os.environ.get('WSL_DISTRO_NAME'))
+        )
+
+        # GitHub-hosted Ubuntu runners are plain Linux, not WSL.
+        if not is_windows and not is_wsl:
+            logger.debug('Not running on Windows/WSL, skipping sync')
             return
 
         windows_root = self.sync_cfg.get('windows_root')
@@ -484,9 +496,6 @@ class Build:
 
         # Convert Windows path to WSL mount path
         wsl_mount = '/mnt/' + windows_root[0].lower() + windows_root[2:].replace('\\', '/')
-
-        # Detect if running in WSL (Linux) or Windows
-        is_wsl = platform.system() == 'Linux'
 
         for p in paths:
             src = f"{wsl_mount}/{p}"
@@ -515,7 +524,7 @@ class Build:
 
     def debuild(self, arch: str, output: str = None, root: str = None, **conf):
         # Sync files from Windows to WSL before building
-        self.sync()
+        self.sync_windows_to_wsl()
 
         conf = conf or self.package
         # root is Flutter SDK root (flutter/), set from [flutter].path in build.toml
