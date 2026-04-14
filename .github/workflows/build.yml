@@ -1,0 +1,132 @@
+name: Build Flutter for Termux
+
+on:
+  workflow_dispatch:
+    inputs:
+      arch:
+        description: Target architecture
+        required: true
+        default: arm64
+        type: choice
+        options:
+          - arm64
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-termux-flutter-${{ github.ref }}-${{ inputs.arch || 'arm64' }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 480
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Free disk space
+        run: |
+          df -h
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /opt/hostedtoolcache/CodeQL || true
+          sudo docker system prune -af || true
+          df -h
+
+      - name: Install system dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y curl git python3 python3-pip ninja-build pkg-config unzip xz-utils libfreetype-dev
+
+      - name: Install Android NDK r27d
+        run: |
+          NDK_DIR=/opt/android-ndk-r27d
+          if [ ! -d "$NDK_DIR" ]; then
+            curl -L --retry 3 https://dl.google.com/android/repository/android-ndk-r27d-linux.zip -o /tmp/android-ndk-r27d-linux.zip
+            sudo unzip -q /tmp/android-ndk-r27d-linux.zip -d /opt
+          fi
+          test -d "$NDK_DIR"
+
+      - name: Setup depot-tools
+        uses: newkdev/setup-depot-tools@v1.0.1
+
+      - name: Install Python requirements
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install -r requirements.txt
+
+      - name: Provide vpython3 fallback
+        run: |
+          if ! command -v vpython3 >/dev/null 2>&1; then
+            printf '%s\n' '#!/usr/bin/env bash' 'exec python3 "$@"' | sudo tee /usr/local/bin/vpython3 >/dev/null
+            sudo chmod +x /usr/local/bin/vpython3
+          fi
+
+      - name: Verify toolchain
+        run: |
+          command -v gclient
+          command -v ninja
+          command -v vpython3
+          test -f .gclient
+          test -d /opt/android-ndk-r27d
+
+      - name: Clone Flutter
+        run: python3 build.py clone
+
+      - name: Sync dependencies
+        run: python3 build.py sync
+
+      - name: Apply patches
+        run: |
+          python3 build.py patch_engine
+          python3 build.py patch_dart
+          python3 build.py patch_skia
+          python3 build.py patch_flutter_sdk
+
+      - name: Build sysroot
+        run: python3 build.py sysroot --arch=${{ inputs.arch }}
+
+      - name: Configure and build
+        run: python3 build.py build_all --arch=${{ inputs.arch }}
+
+      - name: Parse release metadata
+        id: meta
+        run: |
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import tomllib
+          from pathlib import Path
+
+          with open("build.toml", "rb") as f:
+              cfg = tomllib.load(f)
+
+          tag = cfg["flutter"]["tag"]
+          arch = "${{ inputs.arch }}"
+          name = f"flutter-termux-{tag}-{arch}"
+          print(f"tag={tag}")
+          print(f"name={name}")
+          PY
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.meta.outputs.name }}
+          path: |
+            flutter_*.deb
+            release/*.deb
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Create Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            flutter_*.deb
+            release/*.deb
+          name: Flutter ${{ steps.meta.outputs.tag }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
