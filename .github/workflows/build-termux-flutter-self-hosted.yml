@@ -1,0 +1,201 @@
+name: Build Termux Flutter (Self-Hosted)
+
+on:
+  workflow_dispatch:
+    inputs:
+      arch:
+        description: Target architecture
+        required: true
+        default: arm64
+        type: choice
+        options:
+          - arm64
+      force_sync:
+        description: Force a fresh gclient sync even if an existing checkout is present
+        required: true
+        default: false
+        type: boolean
+
+concurrency:
+  group: build-termux-flutter-${{ github.ref }}-${{ inputs.arch || 'arm64' }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: self-hosted
+    timeout-minutes: 480
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          clean: false
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Read build metadata
+        id: meta
+        run: |
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import tomllib
+
+          with open("build.toml", "rb") as f:
+              cfg = tomllib.load(f)
+
+          print(f"flutter_tag={cfg['flutter']['tag']}")
+          print(f"ndk_path={cfg['ndk']['path']}")
+          print(f"arch_default={cfg['build']['arch'][0]}")
+          PY
+
+      - name: Install Python dependencies
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install fire GitPython pyyaml loguru aiohttp requests
+
+      - name: Provide vpython3 wrapper
+        run: |
+          mkdir -p "$RUNNER_TEMP/bin"
+          cat > "$RUNNER_TEMP/bin/vpython3" <<'EOF'
+          #!/usr/bin/env bash
+          exec python3 "$@"
+          EOF
+          chmod +x "$RUNNER_TEMP/bin/vpython3"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+
+      - name: Validate self-hosted runner
+        run: |
+          test -d "${{ steps.meta.outputs.ndk_path }}"
+          command -v git
+          command -v gclient
+          command -v ninja
+          command -v dpkg
+          python3 - <<'PY'
+          import tomllib  # noqa: F401
+          print("python_tomllib_ok")
+          PY
+
+      - name: Create .gclient config
+        run: |
+          cat > .gclient <<'EOF'
+          solutions = [
+              {
+                  "managed": False,
+                  "name": ".",
+                  "url": "https://github.com/flutter/flutter.git",
+                  "custom_deps": {
+                      "build": None,
+                      "buildtools": None,
+                  },
+                  "custom_vars": {
+                      "download_android_deps": False,
+                      "download_windows_deps": False,
+                      "download_linux_deps": False,
+                      "download_dart_sdk": False,
+                  },
+                  "deps_file": "DEPS",
+                  "safesync_url": "",
+              },
+          ]
+          target_os = ["linux", "android"]
+          EOF
+
+      - name: Clone Flutter checkout
+        run: python3 build.py clone
+
+      - name: Sync engine dependencies
+        run: |
+          cp .gclient flutter/.gclient
+          if [ "${{ inputs.force_sync }}" = "true" ] || [ ! -f flutter/.gclient_entries ]; then
+            echo "Running full gclient sync"
+            (
+              cd flutter
+              gclient sync -DR --no-history
+            )
+          else
+            echo "Existing gclient checkout detected, running incremental sync"
+            (
+              cd flutter
+              gclient sync --no-history
+            )
+          fi
+
+      - name: Fix bundled Dart SDK and run pub get
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import shutil
+          import tempfile
+          import urllib.request
+          import zipfile
+          import subprocess
+
+          root = Path("flutter")
+          dart_sdk_dir = root / "engine" / "src" / "third_party" / "dart" / "tools" / "sdks" / "dart-sdk"
+          version_file = dart_sdk_dir / "version"
+
+          if not dart_sdk_dir.exists():
+              raise SystemExit(f"Missing Dart SDK directory: {dart_sdk_dir}")
+
+          version = version_file.read_text().strip() if version_file.exists() else None
+          if version != "3.11.3":
+              url = (
+                  "https://storage.googleapis.com/dart-archive/channels/stable/"
+                  "release/3.11.3/sdk/dartsdk-linux-x64-release.zip"
+              )
+              with tempfile.TemporaryDirectory() as tmp_dir:
+                  zip_path = Path(tmp_dir) / "dartsdk.zip"
+                  urllib.request.urlretrieve(url, zip_path)
+                  shutil.rmtree(dart_sdk_dir)
+                  with zipfile.ZipFile(zip_path, "r") as zf:
+                      zf.extractall(dart_sdk_dir.parent)
+
+          dart_dir = root / "engine" / "src" / "third_party" / "dart"
+          dart_bin = dart_sdk_dir / "bin" / "dart"
+          subprocess.run([str(dart_bin), "pub", "get"], cwd=dart_dir, check=True)
+          PY
+
+      - name: Apply versioned patches
+        env:
+          FLUTTER_TAG: ${{ steps.meta.outputs.flutter_tag }}
+        run: |
+          apply_patch_if_needed() {
+            repo_path="$1"
+            patch_path="$2"
+
+            if git -C "$repo_path" apply --check "$patch_path" >/dev/null 2>&1; then
+              git -C "$repo_path" apply "$patch_path"
+              echo "Applied $patch_path"
+            elif git -C "$repo_path" apply --reverse --check "$patch_path" >/dev/null 2>&1; then
+              echo "Already applied $patch_path"
+            else
+              echo "Patch is not applicable: $patch_path" >&2
+              exit 1
+            fi
+          }
+
+          PATCH_DIR="patches/$FLUTTER_TAG"
+          test -d "$PATCH_DIR"
+
+          apply_patch_if_needed "flutter" "$PATCH_DIR/engine.patch"
+          apply_patch_if_needed "flutter/engine/src/flutter/third_party/dart" "$PATCH_DIR/dart.patch"
+          apply_patch_if_needed "flutter/engine/src/flutter/third_party/skia" "$PATCH_DIR/skia.patch"
+          apply_patch_if_needed "flutter" "$PATCH_DIR/flutter_sdk_arm64_default.patch"
+
+      - name: Build sysroot
+        run: python3 build.py sysroot --arch=${{ inputs.arch }}
+
+      - name: Build complete .deb package
+        run: python3 build.py build_all --arch=${{ inputs.arch }}
+
+      - name: Upload .deb artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: flutter-termux-${{ steps.meta.outputs.flutter_tag }}-${{ inputs.arch }}
+          path: |
+            flutter_*.deb
+            release/*.deb
+          if-no-files-found: error
+          retention-days: 30
