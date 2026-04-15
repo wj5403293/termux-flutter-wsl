@@ -130,27 +130,6 @@ class Build:
         info = (f'{k}\t: {v}' for k, v in self.__dict__.items() if k != 'package')
         logger.info('\n'+'\n'.join(info))
 
-    def android_sdk_root(self, root: str = None, ndk_root: str = None):
-        """创建 Flutter Android 构建默认会查找的 SDK 目录。
-
-        Flutter 3.41.5 的 Android 构建默认会在
-        flutter/engine/src/flutter/third_party/android_tools/sdk/ndk/28.2.13676358
-        下查找 NDK。本方法在仓库工作区内创建这个目录，并把它符号链接到
-        实际安装好的 NDK 路径，避免改动 Flutter 上游 GN 逻辑。
-        """
-        root = Path(root or Path(__file__).parent)
-        if ndk_root:
-            ndk_root = Path(ndk_root).resolve()
-        else:
-            ndk_root = Path(self.toolchain).resolve().parents[3]
-        sdk_root = root / 'engine' / 'src' / 'flutter' / 'third_party' / 'android_tools' / 'sdk'
-        ndk_dir = sdk_root / 'ndk'
-        ndk_version_dir = ndk_dir / '28.2.13676358'
-
-        ndk_dir.mkdir(parents=True, exist_ok=True)
-        ensure_symlink(ndk_version_dir, ndk_root)
-        return str(sdk_root)
-
     def clone(self, *, url: str = None, tag: str = None, out: str = None):
         url = url or self.repo
         out = out or self.root
@@ -417,7 +396,6 @@ class Build:
         root = root or self.root
         sysroot = os.path.abspath(sysroot or self._sysroot.path)
         toolchain = os.path.abspath(toolchain or self.toolchain)
-        android_sdk_root = self.android_sdk_root(root=root)
 
         # Android 构建输出目录
         out_dir = f'android_{mode}_{arch}'
@@ -602,3 +580,4 @@ if __name__ == '__main__':
             "<level>{message}</level>")
         )
     fire.Fire(Build())
+                
