@@ -438,7 +438,7 @@ class Build:
             # Android 目标构建不传 --target-toolchain，保留 Flutter 默认 Android toolchain
             # 这里仅补充 Termux cross-host 所需 GN 参数
             '--gn-args', 'termux_cross_host=true',
-            '--gn-args', f'android_ndk_root="/opt/android-ndk-r28c"',
+            '--gn-args', f'android_sdk_root="{android_sdk_root}"',
             '--gn-args', f'termux_ndk_path="{toolchain}"',
             '--gn-args', f'target_sysroot="{sysroot}"',
             '--gn-args', 'symbol_level=0',
